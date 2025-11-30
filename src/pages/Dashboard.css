@@ -1,18 +1,7 @@
-r/* ==========================
-   THEME COLORS
+/* ==========================
+   THEME COLORS - Using default theme from tailwind.css
 ========================== */
-body {
-    --bg: #ffffff;
-    --text: #000000;
-    --text-strong: #1a1a1a;
-    --text-muted: #666666;
-    --card-bg: #f8f9fa;
-    --hover: #e9ecef;
-    --icon-color: #000000;
-    --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    --border: rgba(0, 0, 0, 0.1);
-    --glow: rgba(59, 130, 246, 0.5);
-}
+/* Removed custom theme overrides to use original dark theme */
 
 
 

@@ -61,7 +61,7 @@
 .sidebar-header h2 {
     font-size: 1.4rem;
     font-weight: 700;
-    color: #000000;
+    color: var(--text);
 }
 
 .toggle-btn {
@@ -107,14 +107,14 @@
 }
 
 .sidebar-link:hover {
-    background: #e9ecef;
-    color: #000000;
+    background: var(--hover);
+    color: var(--text-strong);
 }
 
 .sidebar-link.active {
-    background: #e9ecef;
-    border-left: 4px solid #3b82f6;
-    color: #000000;
+    background: var(--hover);
+    border-left: 4px solid var(--primary);
+    color: var(--text-strong);
 }
 
 /* Submenu styles with smooth animations */
@@ -158,8 +158,8 @@
 }
 
 .sub-submenu-link:hover {
-    background: #e9ecef;
-    color: #000000;
+    background: var(--hover);
+    color: var(--text-strong);
     transform: translateX(5px);
 }
 
@@ -176,12 +176,6 @@
     cursor: pointer;
     transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
     text-align: left;
-}
-
-.submenu-link:hover {
-    background: #e9ecef;
-    color: #000000;
-    transform: translateX(5px);
 }
 
 .submenu-link.with-icon {
@@ -206,8 +200,8 @@
 }
 
 .clickable-parent:hover {
-    background: #e9ecef;
-    color: #000000;
+    background: var(--hover);
+    color: var(--text-strong);
     transform: translateX(5px);
 }
 
@@ -329,8 +323,8 @@
 }
 
 .sub-sub-submenu-link:hover {
-    background: #e9ecef;
-    color: #000000;
+    background: var(--hover);
+    color: var(--text-strong);
     transform: translateX(5px);
 }
 
@@ -349,7 +343,7 @@ body[data-theme="dark"] .sidebar svg {
 
 .sidebar-link:hover svg,
 .sidebar-link.active svg {
-    color: #000000;
+    color: var(--text-strong);
 }
 
 /* ==========================
