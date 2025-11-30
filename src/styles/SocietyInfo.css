@@ -1,0 +1,605 @@
+.society-page {
+    padding: 2rem;
+    color: var(--text);
+    background: var(--bg);
+    transition: 0.3s;
+}
+
+.society-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.back-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+.toolbar {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.toolbar button {
+    background: var(--card-bg);
+    border: 1px solid var(--hover);
+    color: var(--text);
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.toolbar .primary {
+    background: #2563eb;
+    color: white;
+}
+
+.toolbar button:hover {
+    background: var(--hover);
+}
+
+.society-card {
+    background: var(--card-bg);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.form-section {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    flex-grow: 1;
+}
+
+.form-group label {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--hover);
+    background: var(--bg);
+    color: var(--text);
+}
+
+.logo-section {
+    text-align: center;
+    width: 250px;
+}
+
+.logo-box {
+    width: 200px;
+    height: 200px;
+    background: var(--hover);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+    margin-bottom: 1rem;
+}
+
+.logo-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.clear-logo-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+}
+
+.footer-buttons {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.cancel-btn {
+    background: #9ca3af;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+}
+
+.input-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.key-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+}
+
+
+/* ===== Report Modal ===== */
+.report-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+}
+
+.report-modal {
+    background: white;
+    color: black;
+    width: 90%;
+    max-width: 800px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.report-header {
+    background: #2563eb;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+}
+
+.report-body {
+    padding: 1rem;
+    overflow-y: auto;
+    background: #f9fafb;
+}
+
+.report-card {
+    background: white;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.report-logo img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.report-footer {
+    padding: 1rem;
+    background: #f3f4f6;
+    text-align: right;
+}
+
+.report-footer button,
+.close-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+}
+
+
+
+
+.lookup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(6px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+}
+
+.lookup-modal {
+    background: var(--card-bg);
+    color: var(--text);
+    width: 90%;
+    max-width: 800px;
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    transition: 0.3s;
+}
+
+.lookup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #2563eb;
+    color: white;
+    padding: 1rem 1.5rem;
+}
+
+.close-btn {
+    background: white;
+    border: none;
+    color: #1e3a8a;
+    font-weight: bold;
+    border-radius: 0.3rem;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+}
+
+.lookup-search {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    gap: 1rem;
+}
+
+.lookup-search input {
+    flex: 1;
+    padding: 0.6rem;
+    border-radius: 0.4rem;
+    border: 1px solid #ccc;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.result-count {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.lookup-table-container {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.lookup-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.lookup-table th,
+.lookup-table td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--hover);
+}
+
+.lookup-table th {
+    background: var(--hover);
+    position: sticky;
+    top: 0;
+}
+
+.lookup-row:hover {
+    background: rgba(37, 99, 235, 0.1);
+    cursor: pointer;
+}
+
+.no-results {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 1rem;
+}
+
+.lookup-footer {
+    text-align: center;
+    font-size: 0.85rem;
+    padding: 0.8rem;
+    color: var(--text-muted);
+    background: var(--hover);
+}
+
+/* Security Settings Styles */
+.security-content {
+    margin-top: 1.5rem;
+}
+
+.security-tile {
+    background: var(--card-bg);
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--hover);
+}
+
+.security-tile h3 {
+    margin-bottom: 1rem;
+    color: var(--text);
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.security-tile p {
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.security-tile .form-group {
+    margin-bottom: 1rem;
+}
+
+.security-tile .form-group label {
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--text);
+}
+
+.security-tile .form-group input,
+.security-tile .form-group textarea,
+.security-tile .form-group select {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--hover);
+    background: var(--bg);
+    color: var(--text);
+}
+
+.security-tile .form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.security-tile .footer-buttons {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.security-tile .primary {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+.security-tile .cancel-btn {
+    background: #9ca3af;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+}
+
+.security-tile .input-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.security-tile .key-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    cursor: pointer;
+}
+
+.permissions-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.permission-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    color: var(--text);
+}
+
+.permission-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+/* Responsive adjustments for sidebar toggle and mobile */
+@media (max-width: 1024px) {
+    .society-page {
+        padding: 1.5rem;
+    }
+
+    .society-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .toolbar {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .toolbar button {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.9rem;
+    }
+
+    .security-tile {
+        padding: 1.25rem;
+    }
+
+    .security-tile h3 {
+        font-size: 1.1rem;
+    }
+
+    .permissions-grid {
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .society-page {
+        padding: 1rem;
+    }
+
+    .society-header {
+        margin-bottom: 1rem;
+    }
+
+    .society-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+    }
+
+    .toolbar button {
+        justify-content: center;
+        padding: 0.6rem;
+        font-size: 1rem;
+    }
+
+    .security-content {
+        margin-top: 1rem;
+    }
+
+    .security-tile {
+        padding: 1rem;
+        border-radius: 8px;
+    }
+
+    .security-tile h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .security-tile .form-group {
+        margin-bottom: 0.75rem;
+    }
+
+    .security-tile .form-group input,
+    .security-tile .form-group textarea,
+    .security-tile .form-group select {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .security-tile .footer-buttons {
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .security-tile .primary,
+    .security-tile .cancel-btn {
+        width: 100%;
+        padding: 0.6rem;
+        font-size: 1rem;
+    }
+
+    .permissions-grid {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .permission-checkbox {
+        font-size: 0.9rem;
+    }
+
+    .input-with-icon {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .key-btn {
+        align-self: flex-end;
+        padding: 0.4rem 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .society-page {
+        padding: 0.75rem;
+    }
+
+    .society-header h2 {
+        font-size: 1.3rem;
+    }
+
+    .toolbar button {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .security-tile {
+        padding: 0.75rem;
+    }
+
+    .security-tile h3 {
+        font-size: 0.95rem;
+    }
+
+    .security-tile .form-group input,
+    .security-tile .form-group textarea,
+    .security-tile .form-group select {
+        padding: 0.4rem;
+        font-size: 0.85rem;
+    }
+
+    .security-tile .primary,
+    .security-tile .cancel-btn {
+        padding: 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .permissions-grid {
+        gap: 0.4rem;
+    }
+
+    .permission-checkbox {
+        font-size: 0.85rem;
+    }
+}

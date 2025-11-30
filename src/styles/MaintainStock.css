@@ -1,0 +1,222 @@
+/* ==========================
+   THEME COLORS
+========================== */
+body[data-theme="light"] {
+    --bg: #f9fafb;
+    --text: #111827;
+    --text-muted: #6b7280;
+    --card-bg: #ffffff;
+    --hover: #f3f4f6;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+body[data-theme="dark"] {
+    --bg: #0f172a;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --card-bg: #1e293b;
+    --hover: #334155;
+    --shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+}
+
+/* ==========================
+   MAINTAIN STOCK PAGE
+========================== */
+.maintain-stock-page {
+  padding: 2rem 3rem;
+  background: var(--bg);
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.back-btn {
+  background: var(--card-bg);
+  border: none;
+  padding: 0.5rem 0.8rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s ease;
+  box-shadow: var(--shadow);
+  color: var(--text);
+}
+
+.back-btn:hover {
+  background: var(--hover);
+}
+
+/* ==========================
+   MAINTAIN GRID
+========================== */
+.maintain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+}
+
+/* ==========================
+   MAINTAIN CARD
+========================== */
+.maintain-card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 1.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.maintain-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+
+.maintain-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.maintain-card-info h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  color: var(--text);
+}
+
+.maintain-card-info p {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+/* ==========================
+   SECTION PAGE
+========================== */
+.section-page {
+  padding: 2rem 3rem;
+  background: var(--bg);
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+}
+
+.section-page h2 {
+  margin-bottom: 2rem;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.section-form {
+  background: var(--card-bg);
+  padding: 2rem;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--hover);
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.95rem;
+  transition: border 0.2s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.footer-buttons {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.footer-buttons .primary {
+  background-color: #10b981;
+  color: #fff;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.footer-buttons .primary:hover {
+  background-color: #059669;
+}
+
+.footer-buttons .cancel-btn {
+  background-color: #f87171;
+  color: #fff;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.footer-buttons .cancel-btn:hover {
+  background-color: #dc2626;
+}
+
+/* ==========================
+   RESPONSIVE
+========================== */
+@media (max-width: 1024px) {
+  .maintain-stock-page,
+  .section-page {
+    padding: 2rem 1.5rem;
+  }
+
+  .maintain-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}

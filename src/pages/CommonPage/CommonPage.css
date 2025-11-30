@@ -1,0 +1,130 @@
+/* Common Dashboard Styling */
+.common-dashboard-container {
+    padding: 2rem;
+    min-height: 100vh;
+    font-family: "Inter", sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+.common-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.common-dashboard-header h1 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.common-dashboard-header p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+/* Header buttons */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.theme-toggle,
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: 0.9rem;
+    transition: all 0.2s ease-in-out;
+    box-shadow: var(--shadow);
+}
+
+.theme-toggle:hover,
+.logout-btn:hover {
+    background: var(--bg);
+}
+
+.logout-btn {
+    background: #0e0d0d;
+    color: white;
+}
+
+.logout-btn:hover {
+    background: #424040;
+}
+
+/* Card grid */
+.common-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+/* Individual card */
+.common-dashboard-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.common-dashboard-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.dashboard-card-info h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.4rem;
+    color: var(--text-strong);
+}
+
+.dashboard-card-info p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* Light / Dark themes */
+body[data-theme="light"] {
+    --bg: #f9fafb;
+    --text: #1e293b;
+    --text-strong: #111827;
+    --text-muted: #64748b;
+    --card-bg: #ffffff;
+    --hover: #f1f5f9;
+    --shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+body[data-theme="dark"] {
+    --bg: #0f172a;
+    --text: #e2e8f0;
+    --text-strong: #f8fafc;
+    --text-muted: #94a3b8;
+    --card-bg: #1e293b;
+    --hover: #334155;
+    --shadow: 0 4px 12px rgba(255, 255, 255, 0.05);
+}
