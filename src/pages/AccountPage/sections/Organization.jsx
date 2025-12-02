@@ -1,85 +1,226 @@
-import React, { useState } from 'react';
+import React from "react";
+import { withRouter } from "../../../utils/withRouter.jsx";
+import "../../../styles/SocietyInfo.css";
 
-const Organization = () => {
-  const [society, setSociety] = useState('');
-  const [code, setCode] = useState('');
-  const [name, setName] = useState('');
+class Organization extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      organizations: [],
+      showLookup: false,
+      showReport: false,
+      formData: {
+        code: "",
+        name: "",
+        society: "",
+        description: "",
+      },
+    };
+  }
 
-  const handleOk = () => {
-    // Handle OK action
-    console.log('OK clicked', { society, code, name });
+  componentDidMount() {
+    // Demo: Load from localStorage
+    const stored = JSON.parse(localStorage.getItem("organizations") || "[]");
+    this.setState({ organizations: stored });
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (prevState.organizations !== this.state.organizations) {
+      // Demo: Save to localStorage
+      localStorage.setItem("organizations", JSON.stringify(this.state.organizations));
+    }
+  }
+
+  clearForm = () => {
+    this.setState({
+      formData: {
+        code: "",
+        name: "",
+        society: "",
+        description: "",
+      },
+    });
   };
 
-  const handleCancel = () => {
-    // Handle Cancel action
-    setSociety('');
-    setCode('');
-    setName('');
+  handleChange = (e) => {
+    this.setState({
+      formData: { ...this.state.formData, [e.target.name]: e.target.value },
+    });
   };
 
-  return (
-    <div className="organization-section p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold mb-4">Organization</h2>
+  handleAdd = () => {
+    if (!this.state.formData.code) return alert("Please enter a code before adding.");
+    const exists = this.state.organizations.find((o) => o.code === this.state.formData.code);
+    if (exists) return alert("Organization code already exists.");
+    this.setState({
+      organizations: [...this.state.organizations, this.state.formData],
+    });
+    alert("Organization added successfully!");
+    this.clearForm();
+  };
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Society</label>
-        <select
-          value={society}
-          onChange={(e) => setSociety(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Select Society</option>
-          <option value="society1">Society 1</option>
-          <option value="society2">Society 2</option>
-          <option value="society3">Society 3</option>
-        </select>
-      </div>
+  handleUpdate = () => {
+    if (!this.state.formData.code) return alert("Enter code to update organization.");
+    const updated = this.state.organizations.map((o) =>
+      o.code === this.state.formData.code ? this.state.formData : o
+    );
+    this.setState({ organizations: updated });
+    alert("Organization updated successfully!");
+  };
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Code</label>
-        <div className="relative">
-          <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-400">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Enter code"
-          />
+  handleDelete = () => {
+    if (!this.state.formData.code) return alert("Enter code to delete organization.");
+    const filtered = this.state.organizations.filter((o) => o.code !== this.state.formData.code);
+    this.setState({ organizations: filtered });
+    alert("Organization deleted!");
+    this.clearForm();
+  };
+
+  handlePrint = () => {
+    if (!this.state.organizations.length) return alert("No organizations available.");
+    this.setState({ showReport: true });
+  };
+
+  handleSelectOrganization = (organization) => {
+    this.setState({
+      formData: organization,
+      showLookup: false,
+    });
+  };
+
+  render() {
+    return (
+      <div className="society-page">
+        <div className="society-header">
+          <h2>🏢 Organization</h2>
+          <button className="back-btn" onClick={() => this.props.navigate("/account")}>
+            ⬅ Back
+          </button>
         </div>
-      </div>
 
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Enter name"
-        />
-      </div>
+        {/* Toolbar */}
+        <div className="toolbar">
+          <button onClick={this.handleAdd}>➕ Add</button>
+          <button className="primary" onClick={this.handleUpdate}>
+            💾 Update
+          </button>
+          <button onClick={this.handleDelete}>🗑 Delete</button>
+          <button onClick={this.handlePrint}>🖨 Print</button>
+        </div>
 
-      <div className="flex justify-end space-x-4">
-        <button
-          onClick={handleCancel}
-          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleOk}
-          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          OK
-        </button>
-      </div>
-    </div>
-  );
-};
+        {/* Form */}
+        <form className="society-card" onSubmit={(e) => e.preventDefault()}>
+          <div className="form-section">
+            <div className="form-grid">
+              {/* Code + Key */}
+              <div className="form-group code-field">
+                <label>Code:</label>
+                <div className="input-with-icon">
+                  <input
+                    type="text"
+                    name="code"
+                    value={this.state.formData.code}
+                    onChange={this.handleChange}
+                  />
+                  <button
+                    type="button"
+                    className="key-btn"
+                    onClick={() => this.setState({ showLookup: true })}
+                  >
+                    🔑
+                  </button>
+                </div>
+              </div>
 
-export default Organization;
+              {[
+                { label: "Name", name: "name" },
+                { label: "Society", name: "society" },
+                { label: "Description", name: "description" },
+              ].map((field) => (
+                <div className="form-group" key={field.name}>
+                  <label>{field.label}:</label>
+                  <input
+                    type="text"
+                    name={field.name}
+                    value={this.state.formData[field.name]}
+                    onChange={this.handleChange}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Right Section - Placeholder for future use */}
+            <div className="logo-section">
+              <div className="logo-box">
+                <span>No Image</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="footer-buttons">
+            <button type="button" className="btn btn-primary" onClick={this.handleUpdate}>
+              OK
+        </form>
+            <button
+              type="button"
+
+              onClick={() => this.props.navigate("/dashboard")}
+        {/* Lookup Modal */}
+        {this.state.showLookup && (
+          <div className="lookup-overlay">
+          </div>
+            <div className="lookup-modal">
+              <div className="lookup-header">
+                <h3>🔍 Organization Lookup</h3>
+                <button className="close-btn" onClick={() => this.setState({ showLookup: false })}>
+                  ✖
+                </button>
+              </div>
+              <div className="lookup-body">
+                {this.state.organizations.map((org) => (
+                  <div
+                    className="lookup-item"
+                    key={org.code}
+                    onClick={() => this.handleSelectOrganization(org)}
+                  >
+                    <strong>{org.name}</strong> ({org.code})
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Report Modal */}
+        {this.state.showReport && (
+          <div className="report-overlay">
+            <div className="report-modal">
+              <div className="report-header">
+                <h3>📋 Organization Summary Report</h3>
+                <button className="close-btn" onClick={() => this.setState({ showReport: false })}>
+                  ✖
+                </button>
+              </div>
+              <div className="report-body">
+                {this.state.organizations.map((org) => (
+                  <div className="report-card" key={org.code}>
+                    <div className="report-info">
+                      <strong>{org.name}</strong> ({org.code})<br />
+                      Society: {org.society}<br />
+                      Description: {org.description}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="report-footer">
+                <button onClick={() => this.setState({ showReport: false })}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+}
+
+export default withRouter(Organization);

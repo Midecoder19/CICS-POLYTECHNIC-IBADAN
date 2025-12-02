@@ -63,9 +63,6 @@ const Sidebar = memo(({ onSelectSection, onCollapse, currentView, currentSection
   ];
 
   const accountSubsections = [
-    { key: "usermanagement", title: "User Management" },
-    { key: "roles", title: "Roles" },
-    { key: "permissions", title: "Permissions" },
     { key: "organization", title: "Organization" },
     { key: "branch", title: "Branch" },
     { key: "department", title: "Department" },

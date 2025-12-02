@@ -61,7 +61,7 @@ const Dashboard = () => {
     if (lower === "common") {
       setSelectedSection("society");
     } else if (lower === "account") {
-      setSelectedSection("usermanagement");
+      setSelectedSection("organization");
     } else if (lower === "stock") {
       setSelectedSection("maintain");
     } else {
@@ -258,6 +258,40 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+        ) : selectedSection ? (
+          <div>
+            {/* Back to Dashboard Button */}
+            <button
+              onClick={() => {
+                if (hasUnsavedChanges()) {
+                  const confirmLeave = window.confirm(
+                    "You have unsaved changes. Are you sure you want to leave this page?"
+                  );
+                  if (!confirmLeave) return;
+                }
+                setSelectedSection(null);
+              }}
+              style={{
+                margin: "1rem",
+                padding: "0.5rem 1rem",
+                background: "var(--card-bg)",
+                border: "1px solid var(--border)",
+                borderRadius: "8px",
+                color: "var(--text)",
+                cursor: "pointer",
+              }}
+              tabIndex="0"
+            >
+              Back to {view.charAt(0).toUpperCase() + view.slice(1)} Menu
+            </button>
+
+            {/* Render Selected Section with Suspense for lazy loading */}
+            <div style={{ width: '100%', minHeight: 'calc(100vh - 200px)' }}>
+              <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                {renderSection()}
+              </Suspense>
+            </div>
+          </div>
         ) : (
           <div>
             {/* Back to Dashboard Button */}
@@ -286,11 +320,35 @@ const Dashboard = () => {
               Back to Dashboard
             </button>
 
-            {/* Render Selected Section with Suspense for lazy loading */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-start', minHeight: 'calc(100vh - 200px)' }}>
-              <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
-                {renderSection()}
-              </Suspense>
+            {/* Render Sub-Tiles for the selected category */}
+            <div className="common-dashboard-grid">
+              {getSubTiles(view).map((tile, index) => (
+                <motion.div
+                  key={index}
+                  className="common-dashboard-card"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setSelectedSection(tile.key)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div
+                    className="dashboard-card-icon"
+                    style={{
+                      backgroundColor: `${tile.color}20`,
+                      color: tile.color,
+                    }}
+                  >
+                    {tile.icon}
+                  </div>
+                  <div className="dashboard-card-info">
+                    <h3>{tile.title}</h3>
+                    <p>{tile.desc}</p>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           </div>
         )}

@@ -1,8 +1,10 @@
 .society-page {
-    padding: 2rem;
+    padding: 1rem;
     color: var(--text);
     background: var(--bg);
     transition: 0.3s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .society-header {
