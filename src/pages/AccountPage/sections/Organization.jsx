@@ -160,15 +160,19 @@ class Organization extends React.Component {
           <div className="footer-buttons">
             <button type="button" className="btn btn-primary" onClick={this.handleUpdate}>
               OK
-        </form>
+            </button>
             <button
               type="button"
-
               onClick={() => this.props.navigate("/dashboard")}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+
         {/* Lookup Modal */}
         {this.state.showLookup && (
           <div className="lookup-overlay">
-          </div>
             <div className="lookup-modal">
               <div className="lookup-header">
                 <h3>🔍 Organization Lookup</h3>
