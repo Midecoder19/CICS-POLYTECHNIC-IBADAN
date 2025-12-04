@@ -1,6 +1,4 @@
-<<<<<<< HEAD
-# Router-Frontend-
-=======
+
 #   Routers  App - Stock Management System
 
 A modern, responsive React-based frontend application for comprehensive stock and inventory management. Built with cutting-edge technologies to provide an intuitive and efficient user experience for managing business operations.
