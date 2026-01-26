@@ -50,7 +50,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
 // Send verification email
 const sendVerificationEmail = async (to, token) => {
-  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email/${token}`;
+  const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${token}`;
 
   return sendEmail({
     to,

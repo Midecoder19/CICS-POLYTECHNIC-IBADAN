@@ -124,7 +124,10 @@ const verifyEmail = async (req, res) => {
     user.emailVerificationExpires = undefined;
     await user.save();
 
-    res.json({ message: 'Email verified successfully' });
+    res.json({
+      message: 'Email verified successfully',
+      email: user.email
+    });
 
   } catch (error) {
     console.error('Email verification error:', error);

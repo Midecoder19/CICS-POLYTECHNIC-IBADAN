@@ -10,7 +10,7 @@ const app = express();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
 
@@ -54,32 +54,20 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server on available port
-const findAvailablePort = (startPort) => {
-  return new Promise((resolve, reject) => {
-    const server = app.listen(startPort, () => {
-      const port = server.address().port;
-      console.log(`🚀 Server running on port ${port}`);
-      console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📝 Health check: http://localhost:${port}/api/health`);
-      resolve(server);
-    });
-
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        // Port is in use, try next one
-        console.log(`Port ${startPort} in use, trying ${startPort + 1}...`);
-        resolve(findAvailablePort(startPort + 1));
-      } else {
-        reject(err);
-      }
-    });
-  });
-};
-
+// Start server on fixed port
 const PORT = process.env.PORT || 3003;
-findAvailablePort(PORT).catch(err => {
-  console.error('Failed to start server:', err);
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📝 Health check: http://localhost:${PORT}/api/health`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${PORT} is already in use. Please free up the port or set a different PORT environment variable.`);
+    console.error(`💡 You can run: netstat -ano | findstr :${PORT} to find the process using the port`);
+    console.error(`💡 Then kill it with: taskkill /PID <PID> /F`);
+  } else {
+    console.error('Failed to start server:', err);
+  }
   process.exit(1);
 });
 
