@@ -166,4 +166,39 @@ router.post('/refresh', refreshToken);
 router.get('/profile', authenticateToken, requireActiveUser, getProfile);
 router.put('/profile', authenticateToken, requireActiveUser, updateProfileValidation, handleValidationErrors, updateProfile);
 
+// Test routes for email and WhatsApp (remove in production)
+router.post('/test-email', async (req, res) => {
+  try {
+    const { sendVerificationEmail } = require('../utils/emailService');
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    await sendVerificationEmail(email, 'TEST123');
+    res.json({ message: 'Test email sent successfully' });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post('/test-whatsapp', async (req, res) => {
+  try {
+    const { sendVerificationWhatsApp } = require('../utils/smsService');
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ message: 'Phone number is required' });
+    }
+
+    await sendVerificationWhatsApp(phone, 'TEST123');
+    res.json({ message: 'Test WhatsApp message sent successfully' });
+  } catch (error) {
+    console.error('Test WhatsApp error:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 module.exports = router;
