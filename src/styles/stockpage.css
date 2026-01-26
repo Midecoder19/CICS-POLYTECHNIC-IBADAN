@@ -1,0 +1,159 @@
+/* ==========================
+   THEME COLORS
+========================== */
+body[data-theme="light"] {
+    --bg: #f9fafb;
+    --text: #111827;
+    --text-muted: #6b7280;
+    --card-bg: #ffffff;
+    --hover: #f3f4f6;
+    --primary: #2563eb;
+    --success: #16a34a;
+    --warning: #f59e0b;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+body[data-theme="dark"] {
+    --bg: #0f172a;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --card-bg: #1e293b;
+    --hover: #334155;
+    --primary: #2563eb;
+    --success: #16a34a;
+    --warning: #f59e0b;
+    --shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+}
+
+/* ==========================
+   RESET & BASE
+========================== */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: "Inter", sans-serif;
+    transition: all 0.25s ease;
+}
+
+.stock-dashboard-container {
+    min-height: 100vh;
+    background: var(--bg);
+    padding: 2rem 3rem;
+}
+
+/* ==========================
+   HEADER
+========================== */
+.stock-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+}
+
+.stock-dashboard-header .header-left h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.stock-dashboard-header .header-left p {
+    color: var(--text-muted);
+    margin-top: 0.4rem;
+}
+
+.stock-dashboard-header .header-right {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.theme-toggle,
+.back-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--card-bg);
+    color: var(--text);
+    border: none;
+    padding: 0.6rem 1rem;
+    border-radius: 10px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+}
+
+.theme-toggle:hover,
+.back-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ==========================
+   TILES GRID
+========================== */
+.stock-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.8rem;
+}
+
+.stock-dashboard-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 2rem 1.5rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.stock-dashboard-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.15);
+}
+
+.dashboard-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    margin-bottom: 1rem;
+}
+
+.dashboard-card-info h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.4rem;
+}
+
+.dashboard-card-info p {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+/* ==========================
+   RESPONSIVE
+========================== */
+@media (max-width: 768px) {
+    .stock-dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .stock-dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
