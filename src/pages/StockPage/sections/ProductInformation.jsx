@@ -1,89 +1,228 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Key, Plus, Edit, Trash, Printer, X, HelpCircle, Save, RotateCcw } from "lucide-react";
-import "../../../styles/StoreInformation.css";
+import { Key, Plus, Edit, Trash, Printer, X, HelpCircle, Save, RotateCcw, Loader } from "lucide-react";
+import "../../../styles/ProductInformation.css";
 import { useFormContext } from "../../../contexts/FormContext.jsx";
+import ProductService from "../../../services/ProductService.js";
+import { useAuth } from "../../../contexts/AuthContext.jsx";
 
 const ProductInformation = () => {
   const navigate = useNavigate();
   const { markFormAsUnsaved, markFormAsSaved } = useFormContext();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     store: "",
-    itemNo: "",
+    code: "",
     name: "",
-    reorderQty: "",
-    minReorderLevel: "",
-    measure: "",
+    reorderPoint: "",
+    minimumStock: "",
+    category: "",
+    supplier: "",
+    unit: "",
     fraction: "",
-    price: "",
+    purchasePrice: "",
   });
 
   const [modal, setModal] = useState({
     isOpen: false,
     type: null,
     data: [],
+    loading: false,
   });
 
   const [showReport, setShowReport] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentProductId, setCurrentProductId] = useState(null);
+  const [stores, setStores] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [units, setUnits] = useState([]);
 
-  // Demo data - in real app, this would come from API
-  const demoData = {
-    stores: ["Store 1", "Store 2", "Store 3", "Store 4", "Store 5"],
-    itemNos: ["ITEM001", "ITEM002", "ITEM003", "ITEM004", "ITEM005"],
-    measures: ["Kg", "Liter", "Piece", "Box", "Dozen"],
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+      const [storesRes, suppliersRes, unitsRes] = await Promise.all([
+        ProductService.getStores(user?.society),
+        ProductService.getSuppliers(user?.society),
+        ProductService.getUnits()
+      ]);
+
+      setStores(storesRes.data || []);
+      setSuppliers(suppliersRes.data || []);
+      setUnits(unitsRes.data || []);
+    } catch (err) {
+      console.error('Error loading initial data:', err);
+      setError('Failed to load initial data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const newValue = type === 'checkbox' ? checked : value;
+    setFormData(prev => ({ ...prev, [name]: newValue }));
     markFormAsUnsaved("product-info");
   }, [markFormAsUnsaved]);
 
-  const openModal = useCallback((type) => {
-    const data = demoData[type];
-    setModal({
-      isOpen: true,
-      type,
-      data,
-    });
-  }, []);
+  const openModal = useCallback(async (type) => {
+    setModal(prev => ({ ...prev, loading: true, isOpen: true, type }));
+
+    try {
+      let data = [];
+      if (type === 'stores') {
+        data = stores;
+      } else if (type === 'suppliers') {
+        data = suppliers;
+      } else if (type === 'units') {
+        data = units;
+      } else if (type === 'products') {
+        const result = await ProductService.searchProducts('', user?.society);
+        data = result.data || [];
+      }
+
+      setModal(prev => ({ ...prev, data, loading: false }));
+    } catch (err) {
+      console.error(`Error loading ${type}:`, err);
+      setModal(prev => ({ ...prev, data: [], loading: false }));
+    }
+  }, [stores, suppliers, units, user?.society]);
 
   const closeModal = useCallback(() => {
     setModal({
       isOpen: false,
       type: null,
       data: [],
+      loading: false,
     });
   }, []);
 
-  const selectFromModal = useCallback((field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const selectFromModal = useCallback(async (field, value) => {
+    if (field === 'code') {
+      try {
+        const result = await ProductService.searchProducts(value, user?.society);
+        if (result.data && result.data.length > 0) {
+          const product = result.data[0];
+          setFormData({
+            code: product.code || "",
+            name: product.name || "",
+            unit: product.unit || "",
+            purchasePrice: product.purchasePrice?.toString() || "",
+            minimumStock: product.minimumStock?.toString() || "",
+            reorderPoint: product.reorderPoint?.toString() || "",
+            store: product.store || "",
+            supplier: product.supplier || "",
+            description: product.description || "",
+            category: product.category || "",
+            brand: product.brand || "",
+            barcode: product.barcode || "",
+            hsnCode: product.hsnCode || "",
+            gstRate: product.gstRate?.toString() || "",
+            sellingPrice: product.sellingPrice?.toString() || "",
+            mrp: product.mrp?.toString() || "",
+            maximumStock: product.maximumStock?.toString() || "",
+            isEssential: product.isEssential || false,
+            notes: product.notes || "",
+          });
+          setCurrentProductId(product._id);
+        } else {
+          setFormData(prev => ({ ...prev, [field]: value }));
+        }
+      } catch (err) {
+        console.error('Error fetching product:', err);
+        setFormData(prev => ({ ...prev, [field]: value }));
+      }
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
     markFormAsUnsaved("product-info");
     closeModal();
-  }, [markFormAsUnsaved, closeModal]);
+  }, [markFormAsUnsaved, closeModal, user?.society]);
 
   const handleAdd = useCallback(() => {
     setFormData({
-      store: "",
-      itemNo: "",
+      code: "",
       name: "",
-      reorderQty: "",
-      minReorderLevel: "",
-      measure: "",
-      fraction: "",
-      price: "",
+      unit: "",
+      purchasePrice: "",
+      minimumStock: "",
+      reorderPoint: "",
+      store: "",
+      supplier: "",
+      description: "",
+      category: "",
+      brand: "",
+      barcode: "",
+      hsnCode: "",
+      gstRate: "",
+      sellingPrice: "",
+      mrp: "",
+      maximumStock: "",
+      isEssential: false,
+      notes: "",
     });
+    setCurrentProductId(null);
     markFormAsSaved("product-info");
   }, [markFormAsSaved]);
 
-  const handleUpdate = useCallback(() => {
-    alert("Update functionality - to be implemented");
-  }, []);
+  const handleUpdate = useCallback(async () => {
+    if (!currentProductId) {
+      alert("Please select a product to update");
+      return;
+    }
 
-  const handleDelete = useCallback(() => {
-    alert("Delete functionality - to be implemented");
-  }, []);
+    try {
+      setLoading(true);
+      const updateData = {
+        ...formData,
+        purchasePrice: parseFloat(formData.purchasePrice) || 0,
+        sellingPrice: parseFloat(formData.sellingPrice) || 0,
+        mrp: parseFloat(formData.mrp) || 0,
+        minimumStock: parseFloat(formData.minimumStock) || 0,
+        maximumStock: parseFloat(formData.maximumStock) || 0,
+        reorderPoint: parseFloat(formData.reorderPoint) || 0,
+        gstRate: parseFloat(formData.gstRate) || 0,
+      };
+
+      await ProductService.updateProduct(currentProductId, updateData);
+      alert("Product updated successfully!");
+      markFormAsSaved("product-info");
+    } catch (err) {
+      console.error('Error updating product:', err);
+      setError(err.response?.data?.message || 'Failed to update product');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentProductId, formData, user?.society, markFormAsSaved]);
+
+  const handleDelete = useCallback(async () => {
+    if (!currentProductId) {
+      alert("Please select a product to delete");
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this product?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await ProductService.deleteProduct(currentProductId);
+      alert("Product deleted successfully!");
+      handleAdd(); // Reset form
+    } catch (err) {
+      console.error('Error deleting product:', err);
+      setError(err.response?.data?.message || 'Failed to delete product');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentProductId]);
 
   const handlePrint = useCallback(() => {
     setShowReport(true);
@@ -97,19 +236,41 @@ const ProductInformation = () => {
     alert("Help: Use this form to manage product information. Click key icons to lookup existing codes.");
   }, []);
 
-  const handleSubmit = useCallback((e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    alert("Product Information saved successfully!");
-    markFormAsSaved("product-info");
-    // TODO: Implement API call
-    // await saveProductInfo(formData);
-    // const response = await fetch('/api/product-info', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(formData)
-    // });
-    // if (!response.ok) throw new Error('Failed to save product information');
-  }, [markFormAsSaved]);
+
+    try {
+      setLoading(true);
+      const productData = {
+        ...formData,
+        purchasePrice: parseFloat(formData.purchasePrice) || 0,
+        sellingPrice: parseFloat(formData.sellingPrice) || 0,
+        mrp: parseFloat(formData.mrp) || 0,
+        minimumStock: parseFloat(formData.minimumStock) || 0,
+        maximumStock: parseFloat(formData.maximumStock) || 0,
+        reorderPoint: parseFloat(formData.reorderPoint) || 0,
+        gstRate: parseFloat(formData.gstRate) || 0,
+      };
+
+      const result = await ProductService.createProduct(productData);
+      setCurrentProductId(result.data._id);
+      alert("Product created successfully!");
+      markFormAsSaved("product-info");
+    } catch (err) {
+      console.error('Error creating product:', err);
+      // Show detailed validation errors
+      if (err.response?.data?.message) {
+        setError(`Validation Error: ${err.response.data.message}`);
+      } else if (err.response?.data?.errors) {
+        const errorMessages = Object.values(err.response.data.errors).join(', ');
+        setError(`Validation Errors: ${errorMessages}`);
+      } else {
+        setError('Failed to create product. Please check your input and try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [formData, markFormAsSaved]);
 
   const handleCancel = useCallback(() => {
     navigate("/dashboard");
@@ -139,6 +300,17 @@ const ProductInformation = () => {
     </div>
   );
 
+  if (loading && !modal.isOpen) {
+    return (
+      <div className="society-page">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader className="animate-spin mr-2" size={24} />
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="society-page">
@@ -149,46 +321,74 @@ const ProductInformation = () => {
           </button>
         </div>
 
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+            <button
+              onClick={() => setError(null)}
+              className="float-right ml-2"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="toolbar">
-          <button onClick={handleAdd} tabIndex="0">➕ Add</button>
-          <button className="primary" onClick={handleUpdate} tabIndex="0">
-            💾 Update
+          <button
+            className="primary"
+            onClick={handleSubmit}
+            tabIndex="0"
+            disabled={loading}
+          >
+            ➕ Add
           </button>
-          <button onClick={handleDelete} tabIndex="0">🗑 Delete</button>
+          <button
+            onClick={handleUpdate}
+            tabIndex="0"
+            disabled={loading || !currentProductId}
+          >
+            ✏️ Update
+          </button>
+          <button
+            onClick={handleDelete}
+            tabIndex="0"
+            disabled={loading || !currentProductId}
+          >
+            🗑 Delete
+          </button>
           <button onClick={handlePrint} tabIndex="0">🖨 Print</button>
         </div>
 
         {/* Form */}
-        <form className="society-card" onSubmit={handleSubmit}>
+        <form id="product-form" className="society-card" onSubmit={handleSubmit}>
           <div className="form-grid">
-            {/* Store Dropdown */}
+            {/* Store */}
             <div className="form-group">
               <label>Store:</label>
               <select
                 name="store"
                 value={formData.store}
                 onChange={handleInputChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 tabIndex="0"
               >
                 <option value="">Select Store</option>
-                {demoData.stores.map(store => (
-                  <option key={store} value={store}>{store}</option>
+                {stores.map(store => (
+                  <option key={store._id} value={store._id}>{store.storeCode} - {store.name}</option>
                 ))}
               </select>
             </div>
 
-            {/* Item No */}
-            <div className="form-group code-field">
+            {/* Item No (Product Code) */}
+            <div className="form-group">
               <label>Item No:</label>
               <LookupInput
-                name="itemNo"
-                value={formData.itemNo}
+                name="code"
+                value={formData.code}
                 onChange={handleInputChange}
-                dropdownType="itemNos"
-                placeholder="Enter item number"
+                dropdownType="products"
+                placeholder="Enter item no"
                 required
               />
             </div>
@@ -208,15 +408,16 @@ const ProductInformation = () => {
               />
             </div>
 
-            {/* Reorder Qty */}
+            {/* Reorder Quantity */}
             <div className="form-group">
-              <label>Reorder Qty:</label>
+              <label>Reorder Quantity:</label>
               <input
                 type="number"
-                name="reorderQty"
-                value={formData.reorderQty}
+                name="reorderPoint"
+                value={formData.reorderPoint}
                 onChange={handleInputChange}
                 placeholder="Enter reorder quantity"
+                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 tabIndex="0"
               />
@@ -227,76 +428,125 @@ const ProductInformation = () => {
               <label>Min Reorder Level:</label>
               <input
                 type="number"
-                name="minReorderLevel"
-                value={formData.minReorderLevel}
+                name="minimumStock"
+                value={formData.minimumStock}
                 onChange={handleInputChange}
-                placeholder="Enter minimum reorder level"
+                placeholder="Enter min reorder level"
+                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 tabIndex="0"
               />
             </div>
 
-            {/* Purchase Information Section */}
-            <div className="form-group col-span-full">
-              <h3 className="text-lg font-semibold mb-4">Purchase Information</h3>
-            </div>
-
-            {/* Measure */}
+            {/* Type (Category) */}
             <div className="form-group">
-              <label>Measure:</label>
+              <label>Type:</label>
               <select
-                name="measure"
-                value={formData.measure}
+                name="category"
+                value={formData.category}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 tabIndex="0"
               >
-                <option value="">Select Measure</option>
-                {demoData.measures.map(measure => (
-                  <option key={measure} value={measure}>{measure}</option>
-                ))}
+                <option value="">Select Type</option>
+                <option value="FOOD">Food</option>
+                <option value="BEVERAGE">Beverage</option>
+                <option value="HOUSEHOLD">Household</option>
+                <option value="PERSONAL_CARE">Personal Care</option>
+                <option value="OTHER">Other</option>
               </select>
             </div>
 
-            {/* Fraction */}
+            {/* Supplier */}
             <div className="form-group">
-              <label>Fraction:</label>
-              <input
-                type="text"
-                name="fraction"
-                value={formData.fraction}
+              <label>Supplier:</label>
+              <select
+                name="supplier"
+                value={formData.supplier}
                 onChange={handleInputChange}
-                placeholder="Enter fraction"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 tabIndex="0"
-              />
+              >
+                <option value="">Select Supplier</option>
+                {suppliers.map(supplier => (
+                  <option key={supplier._id} value={supplier._id}>{supplier.code} - {supplier.name}</option>
+                ))}
+              </select>
             </div>
+          </div>
 
-            {/* Price */}
-            <div className="form-group">
-              <label>Price:</label>
-              <input
-                type="number"
-                name="price"
-                value={formData.price}
-                onChange={handleInputChange}
-                placeholder="Enter price"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                tabIndex="0"
-              />
+          {/* Purchase Information Section */}
+          <div className="form-section" style={{ marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid #e5e7eb' }}>
+            <h4 style={{ marginBottom: '1rem', color: '#374151' }}>Purchase Information</h4>
+            <div className="form-grid">
+              {/* Measure (Unit) */}
+              <div className="form-group">
+                <label>Measure:</label>
+                <select
+                  name="unit"
+                  value={formData.unit}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  tabIndex="0"
+                >
+                  <option value="">Select Measure</option>
+                  <option value="PIECES">Pieces</option>
+                  <option value="PACK">Pack</option>
+                  {units.filter(unit => unit.code !== 'PIECES' && unit.code !== 'PACK').map(unit => (
+                    <option key={unit.code} value={unit.code}>{unit.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Fraction */}
+              <div className="form-group">
+                <label>Fraction:</label>
+                <input
+                  type="text"
+                  name="fraction"
+                  value={formData.fraction}
+                  onChange={handleInputChange}
+                  placeholder="Enter fraction"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  tabIndex="0"
+                />
+              </div>
+
+              {/* Price (Purchase Price) */}
+              <div className="form-group">
+                <label>Price:</label>
+                <input
+                  type="number"
+                  name="purchasePrice"
+                  value={formData.purchasePrice}
+                  onChange={handleInputChange}
+                  placeholder="Enter price"
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  tabIndex="0"
+                />
+              </div>
             </div>
           </div>
 
           <div className="footer-buttons">
-            <button type="submit" className="primary" tabIndex="0">
-              <Save size={16} className="inline mr-2" />
-              OK
+            <button
+              type="submit"
+              className="primary"
+              tabIndex="0"
+              disabled={loading}
+            >
+              {loading ? <Loader className="animate-spin inline mr-2" size={16} /> : <Save size={16} className="inline mr-2" />}
+              Save
             </button>
             <button
               type="button"
               className="cancel-btn"
               onClick={handleCancel}
               tabIndex="0"
+              disabled={loading}
             >
               <RotateCcw size={16} className="inline mr-2" />
               Cancel
@@ -327,7 +577,7 @@ const ProductInformation = () => {
             {/* Header */}
             <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3 px-4">
               <h5 className="mb-0 fw-semibold">
-                🔑 Select {modal.type === 'stores' ? 'Store' : modal.type === 'itemNos' ? 'Item No' : 'Measure'}
+                🔑 Select {modal.type === 'stores' ? 'Store' : modal.type === 'suppliers' ? 'Supplier' : modal.type === 'products' ? 'Product' : 'Unit'}
               </h5>
               <button
                 className="btn btn-sm btn-light fw-semibold"
@@ -350,7 +600,9 @@ const ProductInformation = () => {
                   onChange={() => {}}
                   tabIndex="0"
                 />
-                <span className="text-muted small">{modal.data.length} result(s)</span>
+                <span className="text-muted small">
+                  {modal.loading ? 'Loading...' : `${modal.data.length} result(s)`}
+                </span>
               </div>
 
               {/* Table */}
@@ -358,23 +610,42 @@ const ProductInformation = () => {
                 <table className="table table-hover align-middle mb-0">
                   <thead className="table-light position-sticky top-0">
                     <tr>
-                      <th>{modal.type === 'stores' ? 'Store' : modal.type === 'itemNos' ? 'Item No' : 'Measure'}</th>
+                      <th>
+                        {modal.type === 'stores' ? 'Store Code - Name' :
+                         modal.type === 'suppliers' ? 'Supplier Code - Name' :
+                         modal.type === 'products' ? 'Product Code - Name' : 'Unit'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {modal.data.length ? (
+                    {modal.loading ? (
+                      <tr>
+                        <td className="text-center text-muted py-4">
+                          <Loader className="animate-spin inline mr-2" size={16} />
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : modal.data.length ? (
                       modal.data.map((item, i) => (
                         <tr
-                          key={i}
+                          key={item._id || i}
                           onClick={() => selectFromModal(
                             modal.type === 'stores' ? 'store' :
-                            modal.type === 'itemNos' ? 'itemNo' : 'measure',
-                            item
+                            modal.type === 'suppliers' ? 'supplier' :
+                            modal.type === 'products' ? 'code' : 'unit',
+                            modal.type === 'products' ? item.code :
+                            modal.type === 'stores' ? item._id :
+                            modal.type === 'suppliers' ? item._id : item.code
                           )}
                           style={{ cursor: "pointer" }}
                           tabIndex="0"
                         >
-                          <td>{item}</td>
+                          <td>
+                            {modal.type === 'products' ? `${item.code} - ${item.name}` :
+                             modal.type === 'stores' ? `${item.storeCode} - ${item.name}` :
+                             modal.type === 'suppliers' ? `${item.code} - ${item.name}` :
+                             `${item.code} - ${item.name}`}
+                          </td>
                         </tr>
                       ))
                     ) : (
@@ -412,14 +683,25 @@ const ProductInformation = () => {
                 <div className="report-info">
                   <strong>Product Information Details</strong><br />
                   <br />
-                  <strong>Store:</strong> {formData.store || "Not set"}<br />
-                  <strong>Item No:</strong> {formData.itemNo || "Not set"}<br />
-                  <strong>Name:</strong> {formData.name || "Not set"}<br />
-                  <strong>Reorder Qty:</strong> {formData.reorderQty || "Not set"}<br />
-                  <strong>Min Reorder Level:</strong> {formData.minReorderLevel || "Not set"}<br />
-                  <strong>Measure:</strong> {formData.measure || "Not set"}<br />
-                  <strong>Fraction:</strong> {formData.fraction || "Not set"}<br />
-                  <strong>Price:</strong> {formData.price || "Not set"}<br />
+                  <strong>Product Code:</strong> {formData.code || "Not set"}<br />
+                  <strong>Product Name:</strong> {formData.name || "Not set"}<br />
+                  <strong>Unit:</strong> {formData.unit || "Not set"}<br />
+                  <strong>Purchase Price:</strong> {formData.purchasePrice || "Not set"}<br />
+                  <strong>Minimum Stock:</strong> {formData.minimumStock || "Not set"}<br />
+                  <strong>Reorder Point:</strong> {formData.reorderPoint || "Not set"}<br />
+                  <strong>Store:</strong> {stores.find(s => s._id === formData.store)?.name || "Not set"}<br />
+                  <strong>Supplier:</strong> {suppliers.find(s => s._id === formData.supplier)?.name || "Not set"}<br />
+                  <strong>Category:</strong> {formData.category || "Not set"}<br />
+                  <strong>Brand:</strong> {formData.brand || "Not set"}<br />
+                  <strong>Barcode:</strong> {formData.barcode || "Not set"}<br />
+                  <strong>HSN Code:</strong> {formData.hsnCode || "Not set"}<br />
+                  <strong>GST Rate:</strong> {formData.gstRate || "Not set"}%<br />
+                  <strong>Selling Price:</strong> {formData.sellingPrice || "Not set"}<br />
+                  <strong>MRP:</strong> {formData.mrp || "Not set"}<br />
+                  <strong>Maximum Stock:</strong> {formData.maximumStock || "Not set"}<br />
+                  <strong>Essential:</strong> {formData.isEssential ? "Yes" : "No"}<br />
+                  <strong>Description:</strong> {formData.description || "Not set"}<br />
+                  <strong>Notes:</strong> {formData.notes || "Not set"}<br />
                 </div>
               </div>
             </div>

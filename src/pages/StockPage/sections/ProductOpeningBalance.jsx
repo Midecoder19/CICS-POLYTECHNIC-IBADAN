@@ -1,90 +1,176 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Key, Plus, Edit, Trash, Printer, X, HelpCircle, Save, RotateCcw } from "lucide-react";
-import "../../../styles/StoreInformation.css";
+import { Key, Plus, Edit, Trash, Printer, X, HelpCircle, Save, RotateCcw, Loader } from "lucide-react";
+import "../../../styles/ProductOpeningBalance.css";
+import { useFormContext } from "../../../contexts/FormContext.jsx";
+import ProductService from "../../../services/ProductService.js";
+import { useAuth } from "../../../contexts/AuthContext.jsx";
 
 const ProductOpeningBalance = () => {
   const navigate = useNavigate();
+  const { markFormAsUnsaved, markFormAsSaved } = useFormContext();
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     store: "",
-    itemCode: "",
-    description: "",
-    measure: "",
-    fraction: "",
+    product: "",
     date: "",
     price: "",
     quantity: "",
     bulkPrice: "",
     bulkQuantity: "",
     extended: "",
+    fraction: "",
+    notes: "",
   });
 
   const [modal, setModal] = useState({
     isOpen: false,
     type: null,
     data: [],
+    loading: false,
   });
 
   const [showReport, setShowReport] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentBalanceId, setCurrentBalanceId] = useState(null);
+  const [stores, setStores] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [financialPeriods, setFinancialPeriods] = useState([]);
 
-  // Demo data - in real app, this would come from API
-  const demoData = {
-    stores: ["Store 1", "Store 2", "Store 3", "Store 4", "Store 5"],
-    itemCodes: ["ITEM001", "ITEM002", "ITEM003", "ITEM004", "ITEM005"],
-    measures: ["Kg", "Liter", "Piece", "Box", "Dozen"],
+  // Load initial data
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+      const [storesRes, productsRes, periodsRes] = await Promise.all([
+        ProductService.getStores(user?.society),
+        ProductService.searchProducts('', user?.society),
+        ProductService.getFinancialPeriods(user?.society)
+      ]);
+
+      setStores(storesRes.data || []);
+      setProducts(productsRes.data || []);
+      setFinancialPeriods(periodsRes.data || []);
+    } catch (err) {
+      console.error('Error loading initial data:', err);
+      setError('Failed to load initial data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  }, []);
+    markFormAsUnsaved("product-opening-balance");
+  }, [markFormAsUnsaved]);
 
-  const openModal = useCallback((type) => {
-    const data = demoData[type];
-    setModal({
-      isOpen: true,
-      type,
-      data,
-    });
-  }, []);
+  const openModal = useCallback(async (type) => {
+    setModal(prev => ({ ...prev, loading: true, isOpen: true, type }));
+
+    try {
+      let data = [];
+      if (type === 'stores') {
+        data = stores;
+      } else if (type === 'products') {
+        data = products;
+      }
+
+      setModal(prev => ({ ...prev, data, loading: false }));
+    } catch (err) {
+      console.error(`Error loading ${type}:`, err);
+      setModal(prev => ({ ...prev, data: [], loading: false }));
+    }
+  }, [stores, products]);
 
   const closeModal = useCallback(() => {
     setModal({
       isOpen: false,
       type: null,
       data: [],
+      loading: false,
     });
   }, []);
 
   const selectFromModal = useCallback((field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    markFormAsUnsaved("product-opening-balance");
     closeModal();
-  }, [closeModal]);
+  }, [markFormAsUnsaved, closeModal]);
 
   const handleAdd = useCallback(() => {
     setFormData({
       store: "",
-      itemCode: "",
-      description: "",
-      measure: "",
-      fraction: "",
+      product: "",
       date: "",
       price: "",
       quantity: "",
       bulkPrice: "",
       bulkQuantity: "",
       extended: "",
+      fraction: "",
+      notes: "",
     });
-  }, []);
+    setCurrentBalanceId(null);
+    markFormAsSaved("product-opening-balance");
+  }, [markFormAsSaved]);
 
-  const handleUpdate = useCallback(() => {
-    alert("Update functionality - to be implemented");
-  }, []);
+  const handleUpdate = useCallback(async () => {
+    if (!currentBalanceId) {
+      alert("Please select an opening balance to update");
+      return;
+    }
 
-  const handleDelete = useCallback(() => {
-    alert("Delete functionality - to be implemented");
-  }, []);
+    try {
+      setLoading(true);
+      const updateData = {
+        ...formData,
+        society: user?.society,
+        price: parseFloat(formData.price) || 0,
+        quantity: parseFloat(formData.quantity) || 0,
+        bulkPrice: parseFloat(formData.bulkPrice) || 0,
+        bulkQuantity: parseFloat(formData.bulkQuantity) || 0,
+        extended: parseFloat(formData.extended) || 0,
+      };
+
+      await ProductService.updateProductOpeningBalance(currentBalanceId, updateData);
+      alert("Product opening balance updated successfully!");
+      markFormAsSaved("product-opening-balance");
+    } catch (err) {
+      console.error('Error updating product opening balance:', err);
+      setError(err.response?.data?.message || 'Failed to update product opening balance');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentBalanceId, formData, user?.society, markFormAsSaved]);
+
+  const handleDelete = useCallback(async () => {
+    if (!currentBalanceId) {
+      alert("Please select an opening balance to delete");
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to delete this opening balance?")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await ProductService.deleteProductOpeningBalance(currentBalanceId);
+      alert("Product opening balance deleted successfully!");
+      handleAdd(); // Reset form
+    } catch (err) {
+      console.error('Error deleting product opening balance:', err);
+      setError(err.response?.data?.message || 'Failed to delete product opening balance');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentBalanceId]);
 
   const handlePrint = useCallback(() => {
     setShowReport(true);
@@ -95,21 +181,36 @@ const ProductOpeningBalance = () => {
   }, [navigate]);
 
   const handleHelp = useCallback(() => {
-    alert("Help: Use this form to manage product opening balance. Click key icons to lookup existing codes.");
+    alert("Help: Use this form to manage product opening balances. Click key icons to lookup existing codes.");
   }, []);
 
-  const handleSubmit = useCallback((e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    alert("Product Opening Balance saved successfully!");
-    // TODO: Implement API call
-    // await saveProductOpeningBalance(formData);
-    // const response = await fetch('/api/product-opening-balance', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(formData)
-    // });
-    // if (!response.ok) throw new Error('Failed to save product opening balance');
-  }, []);
+
+    try {
+      setLoading(true);
+      const balanceData = {
+        ...formData,
+        society: user?.society,
+        price: parseFloat(formData.price) || 0,
+        quantity: parseFloat(formData.quantity) || 0,
+        bulkPrice: parseFloat(formData.bulkPrice) || 0,
+        bulkQuantity: parseFloat(formData.bulkQuantity) || 0,
+        extended: parseFloat(formData.extended) || 0,
+        financialPeriod: user?.currentFinancialPeriod, // Assuming this is available in user context
+      };
+
+      const result = await ProductService.createProductOpeningBalance(balanceData);
+      setCurrentBalanceId(result.data._id);
+      alert("Product opening balance created successfully!");
+      markFormAsSaved("product-opening-balance");
+    } catch (err) {
+      console.error('Error creating product opening balance:', err);
+      setError(err.response?.data?.message || 'Failed to create product opening balance');
+    } finally {
+      setLoading(false);
+    }
+  }, [formData, user?.society, user?.currentFinancialPeriod, markFormAsSaved]);
 
   const handleCancel = useCallback(() => {
     navigate("/dashboard");
@@ -125,36 +226,74 @@ const ProductOpeningBalance = () => {
         placeholder={placeholder}
         required={required}
         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        tabIndex="0"
       />
       <button
         type="button"
         onClick={() => openModal(dropdownType)}
         className="key-btn"
         title={`Lookup ${placeholder}`}
+        tabIndex="0"
       >
         <Key size={16} />
       </button>
     </div>
   );
 
+  if (loading && !modal.isOpen) {
+    return (
+      <div className="society-page">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader className="animate-spin mr-2" size={24} />
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="society-page">
         <div className="society-header">
           <h2>📦 Product Opening Balance</h2>
-          <button className="back-btn" onClick={() => navigate(-1)}>
+          <button className="back-btn" onClick={() => navigate(-1)} tabIndex="0">
             ⬅ Back
           </button>
         </div>
 
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            {error}
+            <button
+              onClick={() => setError(null)}
+              className="float-right ml-2"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* Toolbar */}
         <div className="toolbar">
-          <button onClick={handleAdd}>➕ Add</button>
-          <button className="primary" onClick={handleUpdate}>
+          <button onClick={handleAdd} tabIndex="0" disabled={loading}>
+            ➕ Add
+          </button>
+          <button
+            className="primary"
+            onClick={handleUpdate}
+            tabIndex="0"
+            disabled={loading || !currentBalanceId}
+          >
             💾 Update
           </button>
-          <button onClick={handleDelete}>🗑 Delete</button>
-          <button onClick={handlePrint}>🖨 Print</button>
+          <button
+            onClick={handleDelete}
+            tabIndex="0"
+            disabled={loading || !currentBalanceId}
+          >
+            🗑 Delete
+          </button>
+          <button onClick={handlePrint} tabIndex="0">🖨 Print</button>
         </div>
 
         {/* Form */}
@@ -169,54 +308,45 @@ const ProductOpeningBalance = () => {
                 onChange={handleInputChange}
                 required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               >
                 <option value="">Select Store</option>
-                {demoData.stores.map(store => (
-                  <option key={store} value={store}>{store}</option>
+                {stores.map(store => (
+                  <option key={store._id} value={store._id}>{store.storeCode} - {store.name}</option>
                 ))}
               </select>
             </div>
 
-            {/* Item Code + Key */}
-            <div className="form-group code-field">
-              <label>Item Code:</label>
-              <LookupInput
-                name="itemCode"
-                value={formData.itemCode}
-                onChange={handleInputChange}
-                dropdownType="itemCodes"
-                placeholder="Enter item code"
-                required
-              />
-            </div>
-
-            {/* Description */}
+            {/* Product */}
             <div className="form-group">
-              <label>Description:</label>
-              <input
-                type="text"
-                name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="Enter description"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Measure */}
-            <div className="form-group">
-              <label>Measure:</label>
+              <label>Product:</label>
               <select
-                name="measure"
-                value={formData.measure}
+                name="product"
+                value={formData.product}
                 onChange={handleInputChange}
+                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               >
-                <option value="">Select Measure</option>
-                {demoData.measures.map(measure => (
-                  <option key={measure} value={measure}>{measure}</option>
+                <option value="">Select Product</option>
+                {products.map(product => (
+                  <option key={product._id} value={product._id}>{product.code} - {product.name}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Date */}
+            <div className="form-group">
+              <label>Date:</label>
+              <input
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleInputChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
+              />
             </div>
 
             {/* Fraction */}
@@ -229,24 +359,13 @@ const ProductOpeningBalance = () => {
                 onChange={handleInputChange}
                 placeholder="Enter fraction"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Date */}
-            <div className="form-group">
-              <label>Date:</label>
-              <input
-                type="date"
-                name="date"
-                value={formData.date}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               />
             </div>
 
             {/* Price Label */}
             <div className="form-group col-span-full">
-              <h3 className="text-lg font-semibold mb-4">Price</h3>
+              <h3 className="text-lg font-semibold mb-4">Price Information</h3>
             </div>
 
             {/* Price */}
@@ -258,7 +377,10 @@ const ProductOpeningBalance = () => {
                 value={formData.price}
                 onChange={handleInputChange}
                 placeholder="Enter price"
+                step="0.01"
+                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               />
             </div>
 
@@ -271,13 +393,16 @@ const ProductOpeningBalance = () => {
                 value={formData.quantity}
                 onChange={handleInputChange}
                 placeholder="Enter quantity"
+                step="0.01"
+                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               />
             </div>
 
             {/* Bulk Label */}
             <div className="form-group col-span-full">
-              <h3 className="text-lg font-semibold mb-4">Bulk</h3>
+              <h3 className="text-lg font-semibold mb-4">Bulk Information</h3>
             </div>
 
             {/* Bulk Price */}
@@ -289,7 +414,10 @@ const ProductOpeningBalance = () => {
                 value={formData.bulkPrice}
                 onChange={handleInputChange}
                 placeholder="Enter bulk price"
+                step="0.01"
+                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               />
             </div>
 
@@ -302,7 +430,10 @@ const ProductOpeningBalance = () => {
                 value={formData.bulkQuantity}
                 onChange={handleInputChange}
                 placeholder="Enter bulk quantity"
+                step="0.01"
+                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               />
             </div>
 
@@ -310,36 +441,52 @@ const ProductOpeningBalance = () => {
             <div className="form-group">
               <label>Extended:</label>
               <input
-                type="text"
+                type="number"
                 name="extended"
                 value={formData.extended}
                 onChange={handleInputChange}
                 placeholder="Enter extended value"
+                step="0.01"
+                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="form-group col-span-full">
+              <label>Notes:</label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                placeholder="Enter additional notes"
+                rows="3"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                tabIndex="0"
               />
             </div>
           </div>
 
           <div className="footer-buttons">
-            <button type="submit" className="btn btn-primary inline-flex items-center">
-              <Save size={16} className="mr-2" />
-              OK
+            <button
+              type="submit"
+              className="primary"
+              tabIndex="0"
+              disabled={loading}
+            >
+              {loading ? <Loader className="animate-spin inline mr-2" size={16} /> : <Save size={16} className="inline mr-2" />}
+              Save
             </button>
             <button
               type="button"
-              className="btn cancel-btn inline-flex items-center"
+              className="cancel-btn"
               onClick={handleCancel}
+              tabIndex="0"
+              disabled={loading}
             >
-              <RotateCcw size={16} className="mr-2" />
+              <RotateCcw size={16} className="inline mr-2" />
               Cancel
-            </button>
-            <button
-              type="button"
-              className="print-btn"
-              onClick={handlePrint}
-            >
-              <Printer size={16} className="inline mr-2" />
-              Print
             </button>
           </div>
         </form>
@@ -367,11 +514,12 @@ const ProductOpeningBalance = () => {
             {/* Header */}
             <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3 px-4">
               <h5 className="mb-0 fw-semibold">
-                🔑 Select {modal.type === 'stores' ? 'Store' : modal.type === 'itemCodes' ? 'Item Code' : 'Measure'}
+                🔑 Select {modal.type === 'stores' ? 'Store' : 'Product'}
               </h5>
               <button
                 className="btn btn-sm btn-light fw-semibold"
                 onClick={closeModal}
+                tabIndex="0"
               >
                 ✖ Close
               </button>
@@ -387,8 +535,11 @@ const ProductOpeningBalance = () => {
                   placeholder="Search..."
                   value=""
                   onChange={() => {}}
+                  tabIndex="0"
                 />
-                <span className="text-muted small">{modal.data.length} result(s)</span>
+                <span className="text-muted small">
+                  {modal.loading ? 'Loading...' : `${modal.data.length} result(s)`}
+                </span>
               </div>
 
               {/* Table */}
@@ -396,22 +547,33 @@ const ProductOpeningBalance = () => {
                 <table className="table table-hover align-middle mb-0">
                   <thead className="table-light position-sticky top-0">
                     <tr>
-                      <th>{modal.type === 'stores' ? 'Store' : modal.type === 'itemCodes' ? 'Item Code' : 'Measure'}</th>
+                      <th>
+                        {modal.type === 'stores' ? 'Store Code - Name' : 'Product Code - Name'}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {modal.data.length ? (
+                    {modal.loading ? (
+                      <tr>
+                        <td className="text-center text-muted py-4">
+                          <Loader className="animate-spin inline mr-2" size={16} />
+                          Loading...
+                        </td>
+                      </tr>
+                    ) : modal.data.length ? (
                       modal.data.map((item, i) => (
                         <tr
-                          key={i}
+                          key={item._id || i}
                           onClick={() => selectFromModal(
-                            modal.type === 'stores' ? 'store' :
-                            modal.type === 'itemCodes' ? 'itemCode' : 'measure',
-                            item
+                            modal.type === 'stores' ? 'store' : 'product',
+                            item._id
                           )}
                           style={{ cursor: "pointer" }}
+                          tabIndex="0"
                         >
-                          <td>{item}</td>
+                          <td>
+                            {modal.type === 'stores' ? `${item.storeCode} - ${item.name}` : `${item.code} - ${item.name}`}
+                          </td>
                         </tr>
                       ))
                     ) : (
@@ -440,7 +602,7 @@ const ProductOpeningBalance = () => {
           <div className="report-modal">
             <div className="report-header">
               <h3>📋 Product Opening Balance Report</h3>
-              <button className="close-btn" onClick={() => setShowReport(false)}>
+              <button className="close-btn" onClick={() => setShowReport(false)} tabIndex="0">
                 ✖
               </button>
             </div>
@@ -449,23 +611,22 @@ const ProductOpeningBalance = () => {
                 <div className="report-info">
                   <strong>Product Opening Balance Details</strong><br />
                   <br />
-                  <strong>Store:</strong> {formData.store || "Not set"}<br />
-                  <strong>Item Code:</strong> {formData.itemCode || "Not set"}<br />
-                  <strong>Description:</strong> {formData.description || "Not set"}<br />
-                  <strong>Measure:</strong> {formData.measure || "Not set"}<br />
-                  <strong>Fraction:</strong> {formData.fraction || "Not set"}<br />
+                  <strong>Store:</strong> {stores.find(s => s._id === formData.store)?.name || "Not set"}<br />
+                  <strong>Product:</strong> {products.find(p => p._id === formData.product)?.name || "Not set"}<br />
                   <strong>Date:</strong> {formData.date || "Not set"}<br />
                   <strong>Price:</strong> {formData.price || "Not set"}<br />
                   <strong>Quantity:</strong> {formData.quantity || "Not set"}<br />
                   <strong>Bulk Price:</strong> {formData.bulkPrice || "Not set"}<br />
                   <strong>Bulk Quantity:</strong> {formData.bulkQuantity || "Not set"}<br />
                   <strong>Extended:</strong> {formData.extended || "Not set"}<br />
+                  <strong>Fraction:</strong> {formData.fraction || "Not set"}<br />
+                  <strong>Notes:</strong> {formData.notes || "Not set"}<br />
                 </div>
               </div>
             </div>
             <div className="report-footer">
-              <button onClick={() => window.print()}>🖨 Print Report</button>
-              <button onClick={() => setShowReport(false)}>Close</button>
+              <button onClick={() => window.print()} tabIndex="0">🖨 Print Report</button>
+              <button onClick={() => setShowReport(false)} tabIndex="0">Close</button>
             </div>
           </div>
         </div>

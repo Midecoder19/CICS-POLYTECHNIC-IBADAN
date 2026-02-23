@@ -1,5 +1,6 @@
 import React from "react";
 import { withRouter } from "../../../utils/withRouter.jsx";
+import { api } from "../../../config/api.js";
 
 import "../../../styles/SocietyInfo.css";
 
@@ -7,19 +8,21 @@ class DefaultParameter extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      accounts: [
-        { code: "1001", name: "Cash Account 1" },
-        { code: "1002", name: "Cash Account 2" },
-        { code: "2001", name: "Bank Account 1" },
-        { code: "2002", name: "Bank Account 2" },
-        { code: "3001", name: "Creditor Account 1" },
-        { code: "3002", name: "Creditor Account 2" },
-        { code: "4001", name: "Debtor Account 1" },
-        { code: "4002", name: "Debtor Account 2" },
-      ],
+      accounts: [],
       showLookup: false,
       showReport: false,
+      showHelp: false,
       query: "",
+      currentField: "",
+      loading: false,
+      error: null,
+      success: null,
+      defaultParameter: null,
+      societies: [],
+      organizations: [],
+      branches: [],
+      stores: [],
+      isFinancialPeriodClosed: false,
       formData: {
         society: "",
         organization: "",
@@ -42,6 +45,140 @@ class DefaultParameter extends React.Component {
     };
   }
 
+  componentDidMount() {
+    this.loadDefaultParameters();
+    // Also load financial periods to sync
+    this.loadFinancialPeriods();
+    // Load dropdown data
+    this.loadSocieties();
+    this.loadOrganizations();
+    this.loadBranches();
+    this.loadStores();
+  }
+
+  loadDefaultParameters = async () => {
+    try {
+      this.setState({ loading: true, error: null });
+      const response = await api.get('/common/default-parameter');
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.success && data.data && data.data.length > 0) {
+          const defaultParam = data.data[0]; // Assuming one default parameter per society
+        this.setState({
+          defaultParameter: defaultParam,
+          formData: {
+            society: defaultParam.society?.code || "",
+            organization: defaultParam.organization || "",
+            branch: defaultParam.branch || "",
+            store: defaultParam.store || "",
+            date: defaultParam.date ? new Date(defaultParam.date).toISOString().split('T')[0] : "",
+            bank: defaultParam.bank || "",
+            financialPeriodStart: defaultParam.financialPeriodStart ? new Date(defaultParam.financialPeriodStart).toISOString().split('T')[0] : "",
+            financialPeriodEnd: defaultParam.financialPeriodEnd ? new Date(defaultParam.financialPeriodEnd).toISOString().split('T')[0] : "",
+            cashAccount: defaultParam.cashAccount?.code || "",
+            bankAccount: defaultParam.bankAccount?.code || "",
+            payComponents: defaultParam.payComponents || "",
+            glBank: defaultParam.glBank?.code || "",
+            savings: defaultParam.savings || "",
+            creditorAccount: defaultParam.creditorAccount?.code || "",
+            debtorAccount: defaultParam.debtorAccount?.code || "",
+            processingPriority: defaultParam.processingPriority || "",
+            appStatus: defaultParam.appStatus || "",
+          }
+        });
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        this.setState({
+          error: errorData.message || `Server error: ${response.status}`
+        });
+      }
+    } catch (error) {
+      console.error('Error loading default parameters:', error);
+      this.setState({
+        error: error.message || 'Failed to load default parameters'
+      });
+    } finally {
+      this.setState({ loading: false });
+    }
+  };
+
+  loadFinancialPeriods = async () => {
+    try {
+      const response = await api.get('/common/financial-periods');
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.success && data.data && data.data.length > 0) {
+          // Find current period
+          const currentPeriod = data.data.find(p => p.isCurrent);
+          if (currentPeriod) {
+            // Sync financial period dates to default parameter form
+            this.setState(prevState => ({
+              formData: {
+                ...prevState.formData,
+                financialPeriodStart: currentPeriod.startDate ? new Date(currentPeriod.startDate).toISOString().split('T')[0] : prevState.formData.financialPeriodStart,
+                financialPeriodEnd: currentPeriod.endDate ? new Date(currentPeriod.endDate).toISOString().split('T')[0] : prevState.formData.financialPeriodEnd,
+              },
+              isFinancialPeriodClosed: currentPeriod.isClosed || false
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading financial periods:', error);
+      // Don't show error for this, it's just for syncing
+    }
+  };
+
+  loadSocieties = async () => {
+    try {
+      const response = await api.get('/societies');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          this.setState({ societies: data.data });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading societies:', error);
+    }
+  };
+
+  loadOrganizations = async () => {
+    try {
+      // Load from localStorage as per Organization.jsx
+      const stored = JSON.parse(localStorage.getItem("organizations") || "[]");
+      this.setState({ organizations: stored });
+    } catch (error) {
+      console.error('Error loading organizations:', error);
+    }
+  };
+
+  loadBranches = async () => {
+    try {
+      // Load from localStorage as per Branch.jsx (assuming similar structure)
+      const stored = JSON.parse(localStorage.getItem("branches") || "[]");
+      this.setState({ branches: stored });
+    } catch (error) {
+      console.error('Error loading branches:', error);
+    }
+  };
+
+  loadStores = async () => {
+    try {
+      const response = await api.get('/common/store-information');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          this.setState({ stores: data.data });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading stores:', error);
+    }
+  };
+
   clearForm = () => {
     this.setState({
       formData: {
@@ -63,6 +200,7 @@ class DefaultParameter extends React.Component {
         processingPriority: "",
         appStatus: "",
       },
+      defaultParameter: null,
     });
   };
 
@@ -72,16 +210,157 @@ class DefaultParameter extends React.Component {
     });
   };
 
-  handleAdd = () => {
-    alert("Add functionality not implemented yet.");
+  handleAdd = async () => {
+    try {
+      this.setState({ loading: true, error: null, success: null });
+
+      const data = {
+        society: this.state.formData.society,
+        organization: this.state.formData.organization,
+        branch: this.state.formData.branch,
+        store: this.state.formData.store,
+        date: this.state.formData.date,
+        bank: this.state.formData.bank,
+        financialPeriodStart: this.state.formData.financialPeriodStart,
+        financialPeriodEnd: this.state.formData.financialPeriodEnd,
+        cashAccount: this.state.formData.cashAccount,
+        bankAccount: this.state.formData.bankAccount,
+        payComponents: this.state.formData.payComponents,
+        glBank: this.state.formData.glBank,
+        savings: this.state.formData.savings,
+        creditorAccount: this.state.formData.creditorAccount,
+        debtorAccount: this.state.formData.debtorAccount,
+        processingPriority: this.state.formData.processingPriority,
+        appStatus: this.state.formData.appStatus,
+      };
+
+      const response = await api.post('/common/default-parameter', data);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          this.setState({
+            success: 'Default parameters created successfully',
+            defaultParameter: responseData.data
+          });
+          setTimeout(() => this.setState({ success: null }), 3000);
+        } else {
+          this.setState({
+            error: responseData.message || 'Failed to create default parameters'
+          });
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        this.setState({
+          error: errorData.message || `Server error: ${response.status}`
+        });
+      }
+    } catch (error) {
+      console.error('Error creating default parameters:', error);
+      this.setState({
+        error: error.message || 'Failed to create default parameters'
+      });
+    } finally {
+      this.setState({ loading: false });
+    }
   };
 
-  handleUpdate = () => {
-    alert("Update functionality not implemented yet.");
+  handleUpdate = async () => {
+    try {
+      this.setState({ loading: true, error: null, success: null });
+
+      if (!this.state.defaultParameter) {
+        this.setState({ error: 'No default parameter to update. Please add first.' });
+        return;
+      }
+
+      const data = {
+        society: this.state.formData.society,
+        organization: this.state.formData.organization,
+        branch: this.state.formData.branch,
+        store: this.state.formData.store,
+        date: this.state.formData.date,
+        bank: this.state.formData.bank,
+        financialPeriodStart: this.state.formData.financialPeriodStart,
+        financialPeriodEnd: this.state.formData.financialPeriodEnd,
+        cashAccount: this.state.formData.cashAccount,
+        bankAccount: this.state.formData.bankAccount,
+        payComponents: this.state.formData.payComponents,
+        glBank: this.state.formData.glBank,
+        savings: this.state.formData.savings,
+        creditorAccount: this.state.formData.creditorAccount,
+        debtorAccount: this.state.formData.debtorAccount,
+        processingPriority: this.state.formData.processingPriority,
+        appStatus: this.state.formData.appStatus,
+      };
+
+      const response = await api.put(`/common/default-parameter/${this.state.defaultParameter._id}`, data);
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          this.setState({
+            success: 'Default parameters updated successfully',
+            defaultParameter: responseData.data
+          });
+          setTimeout(() => this.setState({ success: null }), 3000);
+        } else {
+          this.setState({
+            error: responseData.message || 'Failed to update default parameters'
+          });
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        this.setState({
+          error: errorData.message || `Server error: ${response.status}`
+        });
+      }
+    } catch (error) {
+      console.error('Error updating default parameters:', error);
+      this.setState({
+        error: error.message || 'Failed to update default parameters'
+      });
+    } finally {
+      this.setState({ loading: false });
+    }
   };
 
-  handleDelete = () => {
-    alert("Delete functionality not implemented yet.");
+  handleDelete = async () => {
+    if (!this.state.defaultParameter) {
+      this.setState({ error: 'No default parameter to delete' });
+      return;
+    }
+
+    if (!window.confirm('Are you sure you want to delete the default parameters?')) {
+      return;
+    }
+
+    try {
+      this.setState({ loading: true, error: null, success: null });
+
+      const response = await api.delete(`/common/default-parameter/${this.state.defaultParameter._id}`);
+
+      if (response.ok) {
+        this.setState({
+          success: 'Default parameters deleted successfully',
+          defaultParameter: null
+        });
+        this.clearForm();
+        setTimeout(() => this.setState({ success: null }), 3000);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        this.setState({
+          error: errorData.message || `Server error: ${response.status}`
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting default parameters:', error);
+      this.setState({
+        error: error.message || 'Failed to delete default parameters'
+      });
+    } finally {
+      this.setState({ loading: false });
+    }
   };
 
   handlePrint = () => {
@@ -89,7 +368,8 @@ class DefaultParameter extends React.Component {
   };
 
   handleLookup = (field) => {
-    this.setState({ showLookup: true, currentField: field });
+    this.setState({ showLookup: true, currentField: field, query: "" });
+    this.searchAccounts(""); // Load initial accounts
   };
 
   handleLookupSelect = (account) => {
@@ -100,15 +380,38 @@ class DefaultParameter extends React.Component {
   };
 
   closeLookup = () => {
-    this.setState({ showLookup: false });
+    this.setState({ showLookup: false, accounts: [] });
+  };
+
+  searchAccounts = async (searchQuery) => {
+    try {
+      const response = await api.get('/common/default-parameter/search/accounts', {
+        params: {
+          society: this.state.formData.society,
+          query: searchQuery
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          this.setState({ accounts: data.data });
+        }
+      }
+    } catch (error) {
+      console.error('Error searching accounts:', error);
+      this.setState({ accounts: [] });
+    }
+  };
+
+  handleSearchChange = (e) => {
+    const query = e.target.value;
+    this.setState({ query });
+    this.searchAccounts(query);
   };
 
   filteredAccounts = () => {
-    const q = (this.state.query || "").toLowerCase().trim();
-    if (!q) return this.state.accounts;
-    return this.state.accounts.filter((account) =>
-      `${account.code} ${account.name}`.toLowerCase().includes(q)
-    );
+    return this.state.accounts;
   };
 
   render() {
@@ -123,13 +426,41 @@ class DefaultParameter extends React.Component {
 
         {/* Toolbar */}
         <div className="toolbar">
-          <button onClick={this.handleAdd}>➕ Add</button>
-          <button className="primary" onClick={this.handleUpdate}>
-            💾 Update
-          </button>
-          <button onClick={this.handleDelete}>🗑 Delete</button>
-          <button onClick={this.handlePrint}>🖨 Print</button>
+          {!this.state.defaultParameter && (
+            <button onClick={this.handleAdd} disabled={this.state.loading || this.state.isFinancialPeriodClosed}>
+              ➕ Add
+            </button>
+          )}
+          {this.state.defaultParameter && (
+            <button className="primary" onClick={this.handleUpdate} disabled={this.state.loading || this.state.isFinancialPeriodClosed}>
+              💾 Update
+            </button>
+          )}
+          {this.state.defaultParameter && (
+            <button onClick={this.handleDelete} disabled={this.state.loading || this.state.isFinancialPeriodClosed}>
+              🗑 Delete
+            </button>
+          )}
+          <button onClick={this.handlePrint} disabled={this.state.loading}>🖨 Print</button>
+          <button onClick={() => this.setState({ showHelp: true })}>❓ Help</button>
         </div>
+
+        {/* Messages */}
+        {this.state.error && (
+          <div className="error-message" style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '4px', color: '#c33' }}>
+            ❌ {this.state.error}
+          </div>
+        )}
+        {this.state.success && (
+          <div className="success-message" style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: '#efe', border: '1px solid #cfc', borderRadius: '4px', color: '#363' }}>
+            ✅ {this.state.success}
+          </div>
+        )}
+        {this.state.loading && (
+          <div className="loading-message" style={{ marginBottom: '1rem', padding: '0.5rem', backgroundColor: '#eef', border: '1px solid #ccf', borderRadius: '4px', color: '#336' }}>
+            ⏳ Loading...
+          </div>
+        )}
 
         {/* Form */}
         <form className="society-card" onSubmit={(e) => e.preventDefault()}>
@@ -145,8 +476,9 @@ class DefaultParameter extends React.Component {
                     onChange={this.handleChange}
                   >
                     <option value="">Select Society</option>
-                    <option value="society1">Society 1</option>
-                    <option value="society2">Society 2</option>
+                    {this.state.societies.map(society => (
+                      <option key={society._id} value={society.code}>{society.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -160,8 +492,9 @@ class DefaultParameter extends React.Component {
                     onChange={this.handleChange}
                   >
                     <option value="">Select Organization</option>
-                    <option value="org1">Organization 1</option>
-                    <option value="org2">Organization 2</option>
+                    {this.state.organizations.map(org => (
+                      <option key={org.code} value={org.name}>{org.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -175,8 +508,9 @@ class DefaultParameter extends React.Component {
                     onChange={this.handleChange}
                   >
                     <option value="">Select Branch</option>
-                    <option value="branch1">Branch 1</option>
-                    <option value="branch2">Branch 2</option>
+                    {this.state.branches.map(branch => (
+                      <option key={branch.code} value={branch.name}>{branch.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -190,8 +524,9 @@ class DefaultParameter extends React.Component {
                     onChange={this.handleChange}
                   >
                     <option value="">Select Store</option>
-                    <option value="store1">Store 1</option>
-                    <option value="store2">Store 2</option>
+                    {this.state.stores.map(store => (
+                      <option key={store._id} value={store.code}>{store.name}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -387,7 +722,7 @@ class DefaultParameter extends React.Component {
                   type="text"
                   placeholder="Search by code or name..."
                   value={this.state.query || ""}
-                  onChange={(e) => this.setState({ query: e.target.value })}
+                  onChange={this.handleSearchChange}
                 />
                 <span className="result-count">
                   {this.filteredAccounts().length} result(s)
@@ -468,6 +803,51 @@ class DefaultParameter extends React.Component {
               <div className="report-footer">
                 <button onClick={() => window.print()}>🖨 Print Report</button>
                 <button onClick={() => this.setState({ showReport: false })}>Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Help Modal */}
+        {this.state.showHelp && (
+          <div className="lookup-overlay">
+            <div className="lookup-modal">
+              <div className="lookup-header">
+                <h5 className="mb-0 fw-semibold">❓ Help - Default Parameters</h5>
+                <button className="close-btn" onClick={() => this.setState({ showHelp: false })}>
+                  ✖ Close
+                </button>
+              </div>
+              <div className="lookup-body">
+                <div style={{ padding: '1rem', lineHeight: '1.6' }}>
+                  <h6>📋 About Default Parameters</h6>
+                  <p>Default Parameters allow you to set system-wide defaults for various entities and configurations used throughout the application.</p>
+
+                  <h6>🔧 Available Actions</h6>
+                  <ul>
+                    <li><strong>Add:</strong> Create new default parameters (only available when no parameters exist)</li>
+                    <li><strong>Update:</strong> Modify existing default parameters</li>
+                    <li><strong>Delete:</strong> Remove current default parameters</li>
+                    <li><strong>Print:</strong> Generate a report of current parameters</li>
+                    <li><strong>Help:</strong> Display this help information</li>
+                  </ul>
+
+                  <h6>🏢 Entity Selection</h6>
+                  <p>The dropdowns automatically populate with available societies, organizations, branches, and stores created in the system.</p>
+
+                  <h6>📅 Financial Period Restrictions</h6>
+                  <p>When the current financial period is closed, Add, Update, and Delete operations are disabled to maintain data integrity.</p>
+
+                  <h6>💡 Tips</h6>
+                  <ul>
+                    <li>Use the 🔑 buttons to lookup account codes</li>
+                    <li>All required fields must be filled before saving</li>
+                    <li>Changes take effect immediately after updating</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="lookup-footer">
+                💡 Press Close to return to the form.
               </div>
             </div>
           </div>

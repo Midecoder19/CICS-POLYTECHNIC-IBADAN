@@ -23,11 +23,13 @@ body[data-theme="dark"] {
    MAINTAIN STOCK PAGE
 ========================== */
 .maintain-stock-page {
-  padding: 2rem 3rem;
+  padding: 2rem 1rem;
   background: var(--bg);
   min-height: 100vh;
   color: var(--text);
   font-family: "Inter", sans-serif;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .page-header {
@@ -205,6 +207,7 @@ body[data-theme="dark"] {
 /* ==========================
    RESPONSIVE
 ========================== */
+/*
 @media (max-width: 1024px) {
   .maintain-stock-page,
   .section-page {
@@ -220,3 +223,4 @@ body[data-theme="dark"] {
     grid-template-columns: 1fr;
   }
 }
+*/

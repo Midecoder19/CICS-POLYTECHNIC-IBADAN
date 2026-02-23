@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
-const FormContext = createContext();
+const FormContext = createContext({
+  unsavedForms: new Set(),
+  markFormAsUnsaved: () => {},
+  markFormAsSaved: () => {},
+  hasUnsavedChanges: () => false,
+  clearAllUnsaved: () => {},
+});
 
 export const useFormContext = () => {
   const context = useContext(FormContext);

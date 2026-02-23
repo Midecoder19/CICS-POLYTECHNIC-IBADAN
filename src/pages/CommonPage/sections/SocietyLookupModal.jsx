@@ -74,9 +74,9 @@ class SocietyLookupModal extends React.Component {
                 </thead>
                 <tbody>
                   {rows.length ? (
-                    rows.map((s, i) => (
+                    rows.map((s) => (
                       <tr
-                        key={i}
+                        key={s._id}
                         onClick={() => onSelect(s)}
                         style={{ cursor: "pointer" }}
                       >

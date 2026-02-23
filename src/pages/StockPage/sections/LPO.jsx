@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Key, Plus, Edit, Trash, Printer, X, HelpCircle, Save, RotateCcw } from "lucide-react";
-import "../../../styles/StoreInformation.css";
+import "../../../styles/LPO.css";
 
 const LPO = () => {
   const navigate = useNavigate();

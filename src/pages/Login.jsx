@@ -1,43 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useMemberAuth } from '../contexts/MemberAuthContext.jsx';
+import AuthService from '../services/AuthService.js';
+import AuthLeftPanel from '../components/Auth/AuthLeftPanel.jsx';
+import LoginForm from '../components/Auth/LoginForm.jsx';
+import RegisterForm from '../components/Auth/RegisterForm.jsx';
+import SuccessModal from '../components/Auth/SuccessModal.jsx';
+import ErrorModal from '../components/Auth/ErrorModal.jsx';
+import ForgotPasswordModal from '../components/Auth/ForgotPasswordModal.jsx';
 import './LoginCustom.css';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, user } = useAuth();
+  
+  // Determine initial isRegistering based on URL path
+  const isSignupRoute = location.pathname === '/signup';
   const [state, setState] = useState({
-    isRegistering: false,
+    isRegistering: isSignupRoute,
+    signupType: 'member', // 'member' or 'staff'
+    // Member signup fields
+    regMemberId: '',
+    regEmail: '',
+    regFirstName: '',
+    regLastName: '',
+    // Staff signup fields
+    regUsername: '',
+    regPassword: '',
+    regConfirmPassword: '',
+    regTerms: false,
+    // Login fields
     username: '',
     password: '',
     loading: false,
     rememberMe: false,
     loginAttempts: 0,
     accountSuspended: false,
-    regFirstName: '',
-    regLastName: '',
-    regPhoneNumber: '',
-    regEmail: '',
-    regMemberId: '',
-    regAddress: '',
-    regPassword: '',
-    regConfirmPassword: '',
     showErrorModal: false,
     errorMessage: '',
     showSuccessModal: false,
+    successMessage: '',
     showVerificationModal: false,
+    showForgotPasswordModal: false,
+    forgotEmail: '',
     justLoggedIn: false,
+    showPassword: false,
+    showRegPassword: false,
+    showRegConfirmPassword: false,
   });
+
+  // Redirect to member dashboard if already logged in as member
+  useEffect(() => {
+    if (user && user.role === 'member') {
+      navigate('/member/dashboard');
+    }
+  }, [user, navigate]);
+
+  // Redirect staff to dashboard if already logged in as staff
+  useEffect(() => {
+    if (user && (user.role === 'staff' || user.role === 'admin')) {
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setState(prev => ({ ...prev, [name]: value }));
+    if (state.showErrorModal || state.showSuccessModal) {
+      setState(prev => ({ ...prev, showErrorModal: false, showSuccessModal: false }));
+    }
   };
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     const { username, password, accountSuspended, loginAttempts, rememberMe } = state;
+
     if (!username.trim() || !password.trim()) {
       setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Please enter username and password' }));
       return;
@@ -51,8 +90,15 @@ const Login = () => {
     setState(prev => ({ ...prev, loading: true }));
 
     try {
-      await login(username, password);
-      setState(prev => ({ ...prev, loading: false, showSuccessModal: true, justLoggedIn: true }));
+      const userData = await login(username, password);
+
+      setState(prev => ({ ...prev, loading: false, showSuccessModal: true, successMessage: 'Login successful! Redirecting...', justLoggedIn: true }));
+      // Redirect immediately based on user role from response
+      if (userData && userData.role === 'member') {
+        navigate('/member/dashboard');
+      } else if (userData && (userData.role === 'staff' || userData.role === 'admin')) {
+        navigate('/dashboard');
+      }
     } catch (error) {
       const newAttempts = loginAttempts + 1;
       setState(prev => ({ ...prev, loginAttempts: newAttempts, loading: false }));
@@ -65,41 +111,166 @@ const Login = () => {
     }
   };
 
-  const handleRegisterSubmit = (e) => {
+  const togglePasswordVisibility = (field) => {
+    setState(prev => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const handleForgotPassword = () => {
+    setState(prev => ({ ...prev, showForgotPasswordModal: true, showErrorModal: false }));
+  };
+
+  const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
-    const { regFirstName, regLastName, regPhoneNumber, regEmail, regMemberId, regAddress, regPassword, regConfirmPassword } = state;
-    if (!regFirstName.trim() || !regLastName.trim() || !regPhoneNumber.trim() || !regEmail.trim() || !regMemberId.trim() || !regAddress.trim() || !regPassword.trim() || !regConfirmPassword.trim()) {
-      setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Please fill out all registration fields' }));
-      return;
-    }
-    if (regPassword !== regConfirmPassword) {
-      setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Passwords do not match' }));
+    const { forgotEmail } = state;
+    
+
+    if (!forgotEmail.trim()) {
+      setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Please enter your email address' }));
       return;
     }
 
     setState(prev => ({ ...prev, loading: true }));
-    setTimeout(() => {
-      setState(prev => ({ ...prev, loading: false, showVerificationModal: true }));
+
+    try {
+      await AuthService.forgotPassword(forgotEmail);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        showForgotPasswordModal: false,
+        showSuccessModal: true,
+        successMessage: 'Password reset instructions have been sent to your email.'
+      }));
       setTimeout(() => {
-        setState(prev => ({
-          ...prev,
-          showVerificationModal: false,
-          isRegistering: false,
-          regFirstName: '',
-          regLastName: '',
-          regPhoneNumber: '',
-          regEmail: '',
-          regMemberId: '',
-          regAddress: '',
-          regPassword: '',
-          regConfirmPassword: '',
-        }));
-      }, 6000);
-    }, 1500);
+        setState(prev => ({ ...prev, showSuccessModal: false }));
+      }, 3000);
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        showErrorModal: true,
+        errorMessage: error.message || 'Failed to send reset email. Please try again.'
+      }));
+    }
   };
 
-  const fillDemo = () => {
-    setState(prev => ({ ...prev, username: 'demo', password: 'demo' }));
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    const { signupType, regMemberId, regEmail, regFirstName, regLastName, regPhone, regUsername, regPassword, regConfirmPassword, regTerms } = state;
+
+    // Validation for member signup
+    if (signupType === 'member') {
+      if (!regMemberId.trim() || !regEmail.trim() || !regPassword.trim()) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Member ID, email, and password are required' }));
+        return;
+      }
+      if (regPassword !== regConfirmPassword) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Passwords do not match' }));
+        return;
+      }
+      if (regPassword.length < 6) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Password must be at least 6 characters long' }));
+        return;
+      }
+      if (!regTerms) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Please agree to the Terms & Conditions' }));
+        return;
+      }
+    }
+
+    // Validation for staff signup
+    if (signupType === 'staff') {
+      if (!regFirstName.trim() || !regLastName.trim() || !regUsername.trim() || !regEmail.trim() || !regPassword.trim()) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Please fill out all registration fields' }));
+        return;
+      }
+      if (!regTerms) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Please agree to the Terms & Conditions' }));
+        return;
+      }
+      if (regPassword !== regConfirmPassword) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Passwords do not match' }));
+        return;
+      }
+      if (regPassword.length < 6) {
+        setState(prev => ({ ...prev, showErrorModal: true, errorMessage: 'Password must be at least 6 characters long' }));
+        return;
+      }
+    }
+
+    setState(prev => ({ ...prev, loading: true }));
+
+    try {
+      let userData;
+
+      if (signupType === 'member') {
+        userData = {
+          signupType: 'member',
+          memberNumber: regMemberId,
+          email: regEmail,
+          password: regPassword
+        };
+      } else if (signupType === 'staff') {
+        userData = {
+          signupType: 'staff',
+          username: regUsername,
+          password: regPassword,
+          email: regEmail,
+          firstName: regFirstName,
+          lastName: regLastName,
+          role: 'staff' // Default to staff, can be changed to admin later
+        };
+      }
+
+      const response = await AuthService.register(userData);
+
+      // Clear form
+      setState(prev => ({
+        ...prev,
+        regMemberId: '',
+        regFirstName: '',
+        regLastName: '',
+        regPhone: '',
+        regUsername: '',
+        regPassword: '',
+        regConfirmPassword: '',
+        regEmail: '',
+        regTerms: false,
+        loading: false,
+      }));
+
+      if (signupType === 'member') {
+        // For members, redirect to verification page
+        navigate('/verify', { state: { user: response.data } });
+      } else {
+        // For staff, redirect to login
+        setState(prev => ({
+          ...prev,
+          showSuccessModal: true,
+          successMessage: 'Staff account created successfully! You can now login.'
+        }));
+        setTimeout(() => {
+          setState(prev => ({ ...prev, isRegistering: false, showSuccessModal: false }));
+        }, 3000);
+      }
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        showErrorModal: true,
+        errorMessage: error.message || 'Registration failed. Please try again.'
+      }));
+    }
+  };
+
+  const closeModals = () => {
+    setState(prev => ({ 
+      ...prev, 
+      showErrorModal: false, 
+      showSuccessModal: false, 
+      showForgotPasswordModal: false,
+      errorMessage: '',
+      successMessage: ''
+    }));
   };
 
   const {
@@ -108,25 +279,38 @@ const Login = () => {
     password,
     loading,
     rememberMe,
+    loginAttempts,
     accountSuspended,
     regFirstName,
     regLastName,
-    regPhoneNumber,
     regEmail,
+    regPhone,
     regMemberId,
-    regAddress,
+    regUsername,
     regPassword,
     regConfirmPassword,
+    regTerms,
     showErrorModal,
     errorMessage,
     showSuccessModal,
+    successMessage,
     showVerificationModal,
+    showForgotPasswordModal,
+    forgotEmail,
     justLoggedIn,
+    showPassword,
+    showRegPassword,
+    showRegConfirmPassword,
   } = state;
 
   useEffect(() => {
     if (justLoggedIn && user && !showSuccessModal) {
-      navigate('/dashboard');
+      // Redirect based on user role
+      if (user.role === 'member') {
+        navigate('/member/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     }
   }, [user, justLoggedIn, navigate, showSuccessModal]);
 
@@ -134,261 +318,111 @@ const Login = () => {
     if (showSuccessModal && !isRegistering) {
       const timer = setTimeout(() => {
         setState(prev => ({ ...prev, showSuccessModal: false }));
-      }, 6000);
+      }, 4000);
       return () => clearTimeout(timer);
     }
   }, [showSuccessModal, isRegistering]);
 
+  // Handle success message from email verification
+  useEffect(() => {
+    if (location.state?.message && location.state?.type === 'success') {
+      setState(prev => ({
+        ...prev,
+        showSuccessModal: true,
+        successMessage: location.state.message
+      }));
+      // Clear the location state to prevent showing the message again
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
+
+  const setForgotEmail = (value) => {
+    setState(prev => ({ ...prev, forgotEmail: value }));
+  };
+
   return (
-    <div>
-      <div className={`container ${isRegistering ? 'active' : ''}`}>
-        <div className="form-container sign-in">
-          <form onSubmit={handleLoginSubmit}>
-            <h1>Sign In</h1>
-            <input
-              type="text"
-              name="username"
-              placeholder="Username"
-              value={username}
-              onChange={handleChange}
-              required
-              disabled={loading || accountSuspended}
-              autoComplete="off"
-              style={{ paddingRight: '3rem' }}
-            />
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={password}
-              onChange={handleChange}
-              required
-              disabled={loading || accountSuspended}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '0.5rem', marginBottom: '1rem', padding: '0.5rem', borderRadius: '0.5rem', backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
-              <input
-                type="checkbox"
-                id="rememberMe"
-                checked={rememberMe}
-                onChange={(e) => setState(prev => ({ ...prev, rememberMe: e.target.checked }))}
-                disabled={loading}
-                style={{ transform: 'scale(1.2)' }}
-              />
-              <label htmlFor="rememberMe" style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: '500' }}>
-                Remember me
-              </label>
-            </div>
-            <button type="submit" disabled={loading}>
-              {loading ? 'Signing In...' : 'Sign In'}
-            </button>
-            <button type="button" onClick={fillDemo} disabled={loading}>
-              Use Demo
-            </button>
-          </form>
-        </div>
+    <div className="auth-page">
+      <div className="auth-container">
+        <AuthLeftPanel />
 
-        <div className="form-container sign-up">
-          <form onSubmit={handleRegisterSubmit}>
-            <h1>Create Account</h1>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <input
-                type="text"
-                name="regFirstName"
-                placeholder="First Name"
-                value={regFirstName}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-              <input
-                type="text"
-                name="regLastName"
-                placeholder="Last Name"
-                value={regLastName}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <input
-                type="tel"
-                name="regPhoneNumber"
-                placeholder="Phone Number"
-                value={regPhoneNumber}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-              <input
-                type="email"
-                name="regEmail"
-                placeholder="Email"
-                value={regEmail}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <input
-                type="text"
-                name="regMemberId"
-                placeholder="Member ID"
-                value={regMemberId}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-              <input
-                type="text"
-                name="regAddress"
-                placeholder="Address or Location"
-                value={regAddress}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <input
-                type="password"
-                name="regPassword"
-                placeholder="Password"
-                value={regPassword}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-              <input
-                type="password"
-                name="regConfirmPassword"
-                placeholder="Confirm Password"
-                value={regConfirmPassword}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                style={{ flex: 1 }}
-              />
-            </div>
-            <button type="submit" disabled={loading}>
-              {loading ? 'Signing Up...' : 'Sign Up'}
+        {/* Right Side - Forms */}
+        <div className="auth-right-panel">
+          {/* Toggle Buttons */}
+          <div className="auth-toggle">
+            <button
+              type="button"
+              className={`toggle-btn ${!isRegistering ? 'active' : ''}`}
+              onClick={() => setState(prev => ({ ...prev, isRegistering: false }))}
+            >
+              Sign In
             </button>
-          </form>
-        </div>
+            <button
+              type="button"
+              className={`toggle-btn ${isRegistering ? 'active' : ''}`}
+              onClick={() => setState(prev => ({ ...prev, isRegistering: true }))}
+            >
+              Sign Up
+            </button>
+          </div>
 
-        <div className="toggle-container">
-          <div className="toggle">
-            <div className="toggle-panel toggle-left">
-              <h1>Welcome Back!</h1>
-              <p>Register with personal details to use all of site features</p>
-              <button className="hidden" onClick={() => setState(prev => ({ ...prev, isRegistering: false }))}>Sign In</button>
-            </div>
-            <div className="toggle-panel toggle-right">
-              <h1>Welcome</h1>
-              <p>Login with your personal details to use all of site features</p>
-              <button className="hidden" onClick={() => setState(prev => ({ ...prev, isRegistering: true }))}>Sign Up</button>
-            </div>
+          <div className="auth-forms">
+            <LoginForm
+              className={!isRegistering ? 'active' : ''}
+              username={username}
+              password={password}
+              rememberMe={rememberMe}
+              loading={loading}
+              accountSuspended={accountSuspended}
+              showPassword={showPassword}
+              handleChange={handleChange}
+              handleLoginSubmit={handleLoginSubmit}
+              togglePasswordVisibility={togglePasswordVisibility}
+              handleForgotPassword={handleForgotPassword}
+            />
+
+            <RegisterForm
+              className={isRegistering ? 'active' : ''}
+              signupType={state.signupType}
+              regMemberId={regMemberId}
+              regEmail={regEmail}
+              regFirstName={regFirstName}
+              regLastName={regLastName}
+              regPhone={regPhone}
+              regUsername={regUsername}
+              regPassword={regPassword}
+              regConfirmPassword={regConfirmPassword}
+              regTerms={regTerms}
+              loading={loading}
+              handleChange={handleChange}
+              handleRegisterSubmit={handleRegisterSubmit}
+              togglePasswordVisibility={togglePasswordVisibility}
+              showRegPassword={showRegPassword}
+              showRegConfirmPassword={showRegConfirmPassword}
+            />
           </div>
         </div>
       </div>
 
-      {/* SUCCESS MODAL */}
-      {showSuccessModal && (
-        <div className="modal-wrapper">
-          <motion.div
-            className="modal-card"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.9}}
-          >
-            <div className="modal-header" style={{ backgroundColor: "#28a745" }}>
-              ✅ {isRegistering ? "Registration Successful" : "Login Successful"}
-            </div>
-            <div className="modal-body">
-              <span>🎉</span>
-              <h6>{isRegistering ? "Account created!" : "Welcome back!"}</h6>
-              <p>{isRegistering ? "You can now sign in." : "Redirecting to dashboard..."}</p>
-              <div className="spinner-border text-success" role="status" aria-hidden="true"></div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <SuccessModal
+        showSuccessModal={showSuccessModal}
+        successMessage={successMessage}
+        closeModals={closeModals}
+      />
 
-      {/* VERIFICATION MODAL */}
-    
-{/* VERIFICATION MODAL */}
-{showVerificationModal && (
-  <div className="modal-wrapper">
-    <motion.div
-      className="modal-card"
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.4 }}
-    >
-      <div className="modal-header" style={{ backgroundColor: "#007bff" }}>
-        📧 Verification Required
-      </div>
-      <div className="modal-body">
-        <span>📧</span>
-        <h6>Check your email/SMS for verification</h6>
-        <p>We've sent a verification link to your email and phone number. Please verify your account to continue.</p>
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-      </div>
-    </motion.div>
-  </div>
-)}
+      <ErrorModal
+        showErrorModal={showErrorModal}
+        errorMessage={errorMessage}
+        closeModals={closeModals}
+      />
 
-
-      {/* ERROR MODAL */}
-      {showErrorModal && (
-        <div className="modal-wrapper">
-          <motion.div
-            className="modal-card"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="modal-header" style={{ backgroundColor: "#dc3545" }}>
-              ❌ {isRegistering ? "Registration Failed" : "Login Failed"}
-              <button
-                className="text-white font-semibold"
-                onClick={() => setState(prev => ({ ...prev, showErrorModal: false }))}
-              >
-                ✖
-              </button>
-            </div>
-            <div className="modal-body">
-              <span>😞</span>
-              <h6>{isRegistering ? "Registration Error" : "Wrong Credentials"}</h6>
-              <p>{errorMessage}</p>
-              <button
-                className="modal-button"
-                onClick={() => {
-                  setState(prev => ({
-                    ...prev,
-                    showErrorModal: false,
-                    password: !prev.isRegistering ? "" : prev.password,
-                    regPassword: prev.isRegistering ? "" : prev.regPassword,
-                    regConfirmPassword: prev.isRegistering ? "" : prev.regConfirmPassword,
-                  }));
-                }}
-              >
-                Try Again
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-
+      <ForgotPasswordModal
+        showForgotPasswordModal={showForgotPasswordModal}
+        forgotEmail={forgotEmail}
+        loading={loading}
+        handleForgotPasswordSubmit={handleForgotPasswordSubmit}
+        closeModals={closeModals}
+        setForgotEmail={setForgotEmail}
+      />
     </div>
   );
 };

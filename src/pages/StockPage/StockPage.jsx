@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { withRouter } from "../../utils/withRouter.jsx";
 
 import {
@@ -11,6 +11,19 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import "../../styles/StockPage.css";
+
+// Lazy load section components
+const MaintainStock = lazy(() => import("./sections/MaintainStock"));
+const StoreInformation = lazy(() => import("./sections/StoreInformation"));
+const EssentialCommodity = lazy(() => import("./sections/EssentialCommodity"));
+const SupplierInformation = lazy(() => import("./sections/SupplierInformation"));
+const SupplierOpeningBalance = lazy(() => import("./sections/SupplierOpeningBalance"));
+const ProductSetup = lazy(() => import("./sections/ProductSetup"));
+const ProductInformation = lazy(() => import("./sections/ProductInformation"));
+const ProductOpeningBalance = lazy(() => import("./sections/ProductOpeningBalance"));
+const LPO = lazy(() => import("./sections/LPO"));
+const StockReceiptVoucher = lazy(() => import("./sections/StockReceiptVoucher"));
+const StockSales = lazy(() => import("./sections/StockSales"));
 
 class StockPage extends React.Component {
   constructor(props) {
@@ -43,47 +56,140 @@ class StockPage extends React.Component {
     this.props.navigate(`/stock/${section.toLowerCase()}`);
   };
 
+  renderSection = () => {
+    const { section } = this.props.params || {};
+
+    if (!section) return null;
+
+    switch (section.toLowerCase()) {
+      case "maintain":
+        return <MaintainStock />;
+      case "storeinfo":
+        return <StoreInformation />;
+      case "essential":
+        return <EssentialCommodity />;
+      case "supplierinfo":
+        return <SupplierInformation />;
+      case "supplierbalance":
+        return <SupplierOpeningBalance />;
+      case "productsetup":
+        return <ProductSetup />;
+      case "productinfo":
+        return <ProductInformation />;
+      case "productbalance":
+        return <ProductOpeningBalance />;
+      case "lpo":
+        return <LPO />;
+      case "receipt":
+        return <StockReceiptVoucher />;
+      case "sales":
+        return <StockSales />;
+      default:
+        return <div>Section not found</div>;
+    }
+  };
+
   render() {
     const { theme } = this.state;
+    const { section } = this.props.params || {};
 
     const tiles = [
       {
         key: "maintain",
-        title: "Maintain",
+        title: "Maintain Stock",
         desc: "Manage general stock settings and configurations.",
         icon: <Package size={28} />,
         color: "#2563eb",
       },
       {
-        key: "task",
-        title: "Task",
-        desc: "View and manage pending stock tasks efficiently.",
+        key: "storeinfo",
+        title: "Store Information",
+        desc: "Manage store details and information.",
         icon: <ClipboardCheck size={28} />,
         color: "#16a34a",
       },
       {
-        key: "srv",
-        title: "SRV",
-        desc: "Manage Stock Receipt Vouchers for inventory intake.",
+        key: "essential",
+        title: "Essential Commodity",
+        desc: "Handle essential commodities and supplies.",
         icon: <ClipboardCheck size={28} />,
         color: "#dc2626",
       },
       {
-        key: "reports",
-        title: "Reports",
-        desc: "Generate and analyze detailed stock reports.",
+        key: "supplierinfo",
+        title: "Supplier Information",
+        desc: "Manage supplier details and contacts.",
         icon: <ChartBar size={28} />,
         color: "#f59e0b",
       },
+      {
+        key: "supplierbalance",
+        title: "Supplier Opening Balance",
+        desc: "Set and manage supplier opening balances.",
+        icon: <ChartBar size={28} />,
+        color: "#8b5cf6",
+      },
+      {
+        key: "productsetup",
+        title: "Product Setup",
+        desc: "Configure and setup products.",
+        icon: <Package size={28} />,
+        color: "#06b6d4",
+      },
+      {
+        key: "productinfo",
+        title: "Product Information",
+        desc: "Manage detailed product information.",
+        icon: <ClipboardCheck size={28} />,
+        color: "#10b981",
+      },
+      {
+        key: "productbalance",
+        title: "Product Opening Balance",
+        desc: "Set product opening balances.",
+        icon: <ChartBar size={28} />,
+        color: "#f97316",
+      },
+      {
+        key: "lpo",
+        title: "LPO",
+        desc: "Manage Local Purchase Orders.",
+        icon: <ClipboardCheck size={28} />,
+        color: "#ec4899",
+      },
+      {
+        key: "receipt",
+        title: "Stock Receipt Voucher",
+        desc: "Manage Stock Receipt Vouchers.",
+        icon: <Package size={28} />,
+        color: "#84cc16",
+      },
+      {
+        key: "sales",
+        title: "Stock Sales",
+        desc: "Manage stock sales and point of sales.",
+        icon: <Package size={28} />,
+        color: "#22c55e",
+      },
     ];
 
+    // If we have a section parameter, render the section content
+    if (section) {
+      return (
+        <Suspense fallback={<div>Loading...</div>}>
+          {this.renderSection()}
+        </Suspense>
+      );
+    }
+
+    // Otherwise, render the main stock dashboard
     return (
       <div className="stock-dashboard-container">
         {/* ===== HEADER ===== */}
         <header className="stock-dashboard-header">
           <div className="header-left">
-            <h1>Stock Dashboard</h1>
-            <p>Quickly access Maintain, Task, and Reports sections.</p>
+            <h1>Stock Management</h1>
+            <p>Comprehensive stock management system with 10 specialized modules.</p>
           </div>
 
           <div className="header-right">
@@ -120,7 +226,7 @@ class StockPage extends React.Component {
               </div>
               <div className="dashboard-card-info">
                 <h3>{tile.title}</h3>
-                <p>{tile.desc}</p>-
+                <p>{tile.desc}</p>
               </div>
             </motion.div>
           ))}

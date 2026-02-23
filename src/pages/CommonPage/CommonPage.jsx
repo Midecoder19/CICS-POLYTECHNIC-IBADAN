@@ -91,6 +91,14 @@ class CommonPage extends React.Component {
         path: "/common/default",
         color: "#7c3aed",
       },
+      {
+        key: "store",
+        title: "Store Information",
+        desc: "Manage store details and GL account mappings.",
+        icon: <Building2 size={28} strokeWidth={1.8} />,
+        path: "/common/store",
+        color: "#dc2626",
+      },
     ];
 
     return (
