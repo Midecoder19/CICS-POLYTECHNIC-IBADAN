@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+node_modules/
+=======
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -2597,3 +2600,4 @@ coverage/
 # yarn.lock
 
 #
+>>>>>>> c768de8058cb4b2e9cbefcd0dfe79c46b604cbe3
