@@ -1,0 +1,2 @@
+societycode,instcode,fileno,surname,firstname,middlename,gender,email,teleno,bankcode,openbal,presaddress,permaddress,depcode,kinname,kinaddress,kinteleno,kinrelation,maritalstatus,bankaccno
+SOC001,BR001,STU2024004,Davis,Michael,James,M,michael.davis@email.com,08055556666,BANK001,10000.00,"789 Oak Street, Lagos","789 Oak Street, Lagos",DEPT003,"Robert Davis","789 Oak Street, Lagos",08055556667,Father,Married,9876543210
