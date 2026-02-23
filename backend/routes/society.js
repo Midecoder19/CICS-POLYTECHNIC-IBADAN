@@ -5,7 +5,7 @@ const {
   getSocieties,
   getSociety,
   getSocietyByCode,
-  createSociety,  
+  createSociety,     
   updateSociety,
   deleteSociety,
   searchSocieties

@@ -88,10 +88,15 @@ const societySchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for better performance
-societySchema.index({ name: 1 });
-societySchema.index({ isActive: 1 });
-societySchema.index({ code: 1, isActive: 1 }, { unique: true });
+// EXTREME PERFORMANCE INDEXES
+societySchema.index({ code: 1 }, { unique: true }); // Primary lookup by code
+societySchema.index({ name: 1 }); // Name searches
+societySchema.index({ isActive: 1 }); // Active society queries
+societySchema.index({ code: 1, isActive: 1 }, { unique: true }); // Compound unique index
+societySchema.index({ email: 1 }, { sparse: true }); // Email lookups
+societySchema.index({ createdAt: -1 }); // Recent societies
+societySchema.index({ updatedAt: -1 }); // Recently updated
+societySchema.index({ 'bank': 1 }, { sparse: true }); // Bank searches
 
 // Pre-save middleware to set updatedBy
 societySchema.pre('save', function(next) {

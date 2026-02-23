@@ -25,82 +25,163 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// @desc    Register user
+// @desc    Register user (Member activation OR Staff signup)
 const register = async (req, res) => {
   try {
-    const { username, password, email, phone, firstName, lastName, role } = req.body;
+    const { signupType, memberNumber, email, firstName, lastName, username, password } = req.body;
 
-    const existingUser = await User.findOne({
-      $or: [
-        { username: username },
-        { email: email }
-      ]
-    });
-
-    if (existingUser) {
+    // Validate signup type
+    if (!signupType || !['member', 'staff'].includes(signupType)) {
       return res.status(400).json({
-        message: 'User already exists with this username or email'
+        success: false,
+        message: 'Invalid signup type. Must be "member" or "staff"'
       });
     }
 
-    const user = await User.create({
-      username,
-      password,
-      email,
-      phone,
-      firstName,
-      lastName,
-      role: role || 'member'
-    });
-
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    const phoneToken = generateOTP();
-
-    user.emailVerificationToken = emailToken;
-    user.phoneVerificationToken = phoneToken;
-    user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
-    user.phoneVerificationExpires = Date.now() + 10 * 60 * 1000;
-    await user.save();
-
-    // Send verification email and SMS/WhatsApp (non-blocking)
-    // Note: Errors are caught but registration continues to allow user to resend codes
-    if (user.email) {
-      sendVerificationEmail(user.email, emailToken).catch(err => {
-        console.error('Email sending failed:', err.message);
-        // Log error but don't expose sensitive information
-      });
-    }
-
-    if (user.phone) {
-      sendVerificationSMS(user.phone, phoneToken).catch(err => {
-        console.error('SMS sending failed:', err.message);
-        // Log error but don't expose sensitive information
-      });
-
-      if (process.env.WHATSAPP_ENABLED !== 'false') {
-        sendVerificationWhatsApp(user.phone, phoneToken).catch(err => {
-          console.error('WhatsApp sending failed:', err.message);
-          // Log error but don't expose sensitive information
+    // MEMBER SIGNUP FLOW (Activation-based)
+    if (signupType === 'member') {
+      // Validate required fields for member signup
+      if (!memberNumber || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Member ID, email, and password are required for member activation.'
         });
       }
+
+      // Check if member exists in database
+      const existingMember = await User.findOne({
+        memberNumber: memberNumber.trim(),
+        role: 'member'
+      });
+
+      if (!existingMember) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid Member ID. Please contact your cooperative administrator.'
+        });
+      }
+
+      // Check if member is already activated
+      if (existingMember.activated) {
+        return res.status(400).json({
+          success: false,
+          message: 'This member account is already activated. Please login with your credentials.'
+        });
+      }
+
+      // Check if member has been approved by admin
+      if (existingMember.status !== 'approved') {
+        return res.status(400).json({
+          success: false,
+          message: 'Your member account is pending approval. Please contact your cooperative administrator.'
+        });
+      }
+
+      // Check if email is already in use by another member
+      const existingEmail = await User.findOne({
+        email: email.toLowerCase().trim(),
+        role: 'member',
+        _id: { $ne: existingMember._id }
+      });
+
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'This email is already registered to another member account.'
+        });
+      }
+
+      // Generate verification token
+      const verificationToken = generateOTP();
+
+      // Update member record with new information
+      existingMember.email = email.toLowerCase().trim();
+      existingMember.memberNumber = memberNumber.trim(); // Store original member number
+      existingMember.username = memberNumber.padStart(3, '0'); // Pad to meet min length requirement
+      existingMember.password = password; // Plain password - will be hashed by pre-save hook
+      existingMember.status = 'approved'; // Auto-approve
+      existingMember.emailVerificationToken = verificationToken;
+      existingMember.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+      await existingMember.save();
+
+      // Send verification email
+      try {
+        await sendVerificationEmail(existingMember.email, verificationToken);
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+        console.log(`TESTING: Verification code for ${existingMember.email} is: ${verificationToken}`);
+        // Continue anyway, user can request resend
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: 'Verification email sent. Please check your email and enter the verification code.',
+        data: {
+          id: existingMember._id,
+          memberNumber: existingMember.memberNumber,
+          email: existingMember.email,
+          requiresVerification: true
+        }
+      });
     }
 
-    res.status(201).json({
-      message: 'User registered successfully. Please check your email and phone for verification codes.',
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        role: user.role
+    // STAFF/ADMIN SIGNUP FLOW (Direct registration)
+    else if (signupType === 'staff') {
+      // Validate required fields for staff signup
+      if (!username || !email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Username, email, and password are required for staff signup.'
+        });
       }
-    });
+
+      // Check for existing user
+      const existingUser = await User.findOne({
+        $or: [
+          { username: username },
+          { email: email.toLowerCase() }
+        ]
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'User already exists with this username or email'
+        });
+      }
+
+      // Create staff/admin user (approved by default)
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const user = await User.create({
+        username,
+        password: hashedPassword,
+        email: email.toLowerCase(),
+        firstName: firstName,
+        lastName: lastName,
+        role: 'staff', // Default to staff, can be changed to admin later
+        status: 'approved', // Staff/admin are approved immediately
+        activated: true
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Staff account created successfully. You can now login.',
+        data: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          status: 'approved'
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({
-      message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      success: false,
+      message: 'Registration failed'
     });
   }
 };
@@ -108,30 +189,44 @@ const register = async (req, res) => {
 // @desc    Verify email
 const verifyEmail = async (req, res) => {
   try {
-    const { token } = req.body;
+    const { email, code } = req.body;
 
     const user = await User.findOne({
-      emailVerificationToken: token,
+      email,
+      emailVerificationToken: code,
       emailVerificationExpires: { $gt: Date.now() }
     });
 
     if (!user) {
-      return res.status(400).json({ message: 'Invalid or expired verification token' });
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
+      });
     }
 
     user.isEmailVerified = true;
     user.emailVerificationToken = undefined;
     user.emailVerificationExpires = undefined;
+
+    // For members, activate the account after email verification
+    if (user.role === 'member') {
+      user.activated = true;
+    }
+
     await user.save();
 
     res.json({
+      success: true,
       message: 'Email verified successfully',
-      email: user.email
+      data: { email: user.email }
     });
 
   } catch (error) {
     console.error('Email verification error:', error);
-    res.status(500).json({ message: 'Email verification failed' });
+    res.status(500).json({
+      success: false,
+      message: 'Email verification failed'
+    });
   }
 };
 
@@ -147,7 +242,10 @@ const verifyPhone = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ message: 'Invalid or expired verification code' });
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code'
+      });
     }
 
     user.isPhoneVerified = true;
@@ -155,37 +253,91 @@ const verifyPhone = async (req, res) => {
     user.phoneVerificationExpires = undefined;
     await user.save();
 
-    res.json({ message: 'Phone verified successfully' });
+    res.json({
+      success: true,
+      message: 'Phone verified successfully',
+      data: { phone: user.phone }
+    });
 
   } catch (error) {
     console.error('Phone verification error:', error);
-    res.status(500).json({ message: 'Phone verification failed' });
+    res.status(500).json({ success: false, message: 'Phone verification failed' });
   }
 };
 
-// @desc    Login user
+// @desc    Login user (Member, Staff, or Admin)
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const user = await User.findOne({
+    let user;
+
+    // Priority search: Admin/Staff first, then Members
+    // First try to find admin/staff by username or email
+    user = await User.findOne({
       $or: [
         { username: username },
         { email: username }
-      ]
-    });
+      ],
+      role: { $in: ['admin', 'staff'] }
+    }).populate('society', 'code name');
 
+    // If not found, try to find member by memberNumber or email
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      user = await User.findOne({
+        $or: [
+          { memberNumber: username },
+          { email: username }
+        ],
+        role: 'member'
+      }).populate('society', 'code name');
     }
 
+    // If still not found, try username for members (fallback)
+    if (!user) {
+      user = await User.findOne({
+        username: username,
+        role: 'member'
+      }).populate('society', 'code name');
+    }
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // For members, check if activated and approved
+    if (user.role === 'member') {
+      if (!user.activated) {
+        return res.status(401).json({
+          success: false,
+          message: 'Account not activated. Please complete signup process.'
+        });
+      }
+      if (user.status !== 'approved') {
+        return res.status(401).json({
+          success: false,
+          message: 'Account pending approval. Please contact administrator.'
+        });
+      }
+    }
+
+    // Check password for all users
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
     if (!user.isActive) {
-      return res.status(401).json({ message: 'Account is deactivated' });
+      return res.status(401).json({
+        success: false,
+        message: 'Account is deactivated'
+      });
     }
 
     user.lastLogin = new Date();
@@ -195,24 +347,103 @@ const login = async (req, res) => {
     const refreshToken = generateRefreshToken(user._id);
 
     res.json({
+      success: true,
       message: 'Login successful',
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        isPhoneVerified: user.isPhoneVerified
-      },
-      token,
-      refreshToken
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          memberNumber: user.memberNumber,
+          society: user.society,
+          isEmailVerified: user.isEmailVerified,
+          isPhoneVerified: user.isPhoneVerified,
+          activated: user.activated
+        },
+        token,
+        refreshToken
+      }
     });
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Login failed' });
+    res.status(500).json({
+      success: false,
+      message: 'Login failed'
+    });
+  }
+};
+
+// @desc    Activate member account (set password after email verification) - Auto approve
+const activateMemberAutoApprove = async (req, res) => {
+  try {
+    const { memberNumber, password, verificationCode } = req.body;
+
+    // Validate required fields
+    if (!memberNumber || !password || !verificationCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Member ID, password, and verification code are required.'
+      });
+    }
+
+    // Find member by memberNumber and verification code
+    const member = await User.findOne({
+      memberNumber: memberNumber.trim(),
+      role: 'member',
+      emailVerificationToken: verificationCode,
+      emailVerificationExpires: { $gt: Date.now() }
+    });
+
+    if (!member) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid Member ID or verification code.'
+      });
+    }
+
+    // Check if member is already activated
+    if (member.activated) {
+      return res.status(400).json({
+        success: false,
+        message: 'Member account is already activated. Please login.'
+      });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Update member record
+    member.password = hashedPassword;
+    member.activated = true;
+    member.status = 'approved'; // Auto-approve after activation
+    member.emailVerificationToken = undefined;
+    member.emailVerificationExpires = undefined;
+    member.activatedAt = new Date();
+
+    await member.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Member account activated successfully. You can now login.',
+      data: {
+        id: member._id,
+        memberNumber: member.memberNumber,
+        email: member.email,
+        activated: true,
+        status: 'approved'
+      }
+    });
+
+  } catch (error) {
+    console.error('Member activation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Activation failed'
+    });
   }
 };
 
@@ -246,11 +477,17 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    res.json({ message: 'If an account with this email exists, a reset link has been sent.' });
+    res.json({
+      success: true,
+      message: 'If an account with this email exists, a reset link has been sent.'
+    });
 
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ message: 'Password reset request failed' });
+    res.status(500).json({
+      success: false,
+      message: 'Password reset request failed'
+    });
   }
 };
 
@@ -265,7 +502,7 @@ const resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    return res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
     }
 
     user.password = newPassword;
@@ -273,11 +510,11 @@ const resetPassword = async (req, res) => {
     user.passwordResetExpires = undefined;
     await user.save();
 
-    res.json({ message: 'Password reset successfully' });
+    res.json({ success: true, message: 'Password reset successfully' });
 
   } catch (error) {
     console.error('Reset password error:', error);
-    res.status(500).json({ message: 'Password reset failed' });
+    res.status(500).json({ success: false, message: 'Password reset failed' });
   }
 };
 
@@ -287,7 +524,7 @@ const refreshToken = async (req, res) => {
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
-      return res.status(401).json({ message: 'Refresh token required' });
+    return res.status(401).json({ success: false, message: 'Refresh token required' });
     }
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key');
@@ -300,26 +537,35 @@ const refreshToken = async (req, res) => {
     const newToken = generateToken(user._id);
 
     res.json({
-      token: newToken,
-      refreshToken
+      success: true,
+      message: 'Token refreshed successfully',
+      data: {
+        token: newToken,
+        refreshToken
+      }
     });
 
   } catch (error) {
     console.error('Token refresh error:', error);
-    res.status(401).json({ message: 'Invalid refresh token' });
+    res.status(401).json({
+      success: false,
+      message: 'Invalid refresh token'
+    });
   }
 };
 
 // @desc    Get current user profile
 const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user._id).select('-password').populate('society', 'code name');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     res.json({
-      user: {
+      success: true,
+      message: 'Profile retrieved successfully',
+      data: {
         id: user._id,
         username: user.username,
         email: user.email,
@@ -327,6 +573,7 @@ const getProfile = async (req, res) => {
         lastName: user.lastName,
         phone: user.phone,
         role: user.role,
+        society: user.society,
         isActive: user.isActive,
         isEmailVerified: user.isEmailVerified,
         isPhoneVerified: user.isPhoneVerified,
@@ -336,7 +583,10 @@ const getProfile = async (req, res) => {
     });
   } catch (error) {
     console.error('Get profile error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
   }
 };
 
@@ -354,18 +604,19 @@ const resendEmailVerification = async (req, res) => {
       return res.status(400).json({ message: 'Email is already verified' });
     }
 
-    const emailToken = crypto.randomBytes(32).toString('hex');
+    const emailToken = generateOTP();
     user.emailVerificationToken = emailToken;
-    user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+    user.emailVerificationExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
     await user.save();
 
     try {
       await sendVerificationEmail(user.email, emailToken);
-      res.json({ message: 'Verification email sent successfully' });
+      res.json({ success: true, message: 'Verification email sent successfully' });
     } catch (error) {
       console.error('Resend email verification error:', error.message);
-      res.status(500).json({ 
-        message: 'Failed to resend verification email. Please check your email service configuration.' 
+      res.status(500).json({
+        success: false,
+        message: 'Failed to resend verification email. Please check your email service configuration.'
       });
     }
   } catch (error) {
@@ -403,17 +654,84 @@ const resendPhoneVerification = async (req, res) => {
       }
 
       await Promise.all(sendPromises);
-      res.json({ message: 'Verification code sent successfully' });
+      res.json({ success: true, message: 'Verification code sent successfully' });
     } catch (error) {
       console.error('Resend phone verification error:', error.message);
-      res.status(500).json({ 
-        message: 'Failed to resend verification code. Please check your SMS/WhatsApp service configuration.' 
+      res.status(500).json({
+        success: false,
+        message: 'Failed to resend verification code. Please check your SMS/WhatsApp service configuration.'
       });
     }
   } catch (error) {
     console.error('Resend phone verification error:', error.message);
     res.status(500).json({ 
       message: 'Failed to resend verification code' 
+    });
+  }
+};
+
+// @desc    Activate member account (set password after approval)
+const activateMemberAfterApproval = async (req, res) => {
+  try {
+    const { email, code, password } = req.body;
+
+    const user = await User.findOne({
+      email,
+      emailVerificationToken: code,
+      emailVerificationExpires: { $gt: Date.now() },
+      role: 'member',
+      status: 'approved' // Must be approved by admin
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid activation code or account not approved'
+      });
+    }
+
+    if (user.activated) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account is already activated'
+      });
+    }
+
+    // Set password and activate account
+    user.password = password;
+    user.activated = true;
+    user.isEmailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    res.json({
+      success: true,
+      message: 'Account activated successfully',
+      data: {
+        user: {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          memberNumber: user.memberNumber,
+          activated: user.activated
+        },
+        token,
+        refreshToken
+      }
+    });
+
+  } catch (error) {
+    console.error('Member activation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Account activation failed'
     });
   }
 };
@@ -454,8 +772,9 @@ const updateProfile = async (req, res) => {
     await user.save();
 
     res.json({
+      success: true,
       message: 'Profile updated successfully',
-      user: {
+      data: {
         id: user._id,
         username: user.username,
         email: user.email,
@@ -463,6 +782,7 @@ const updateProfile = async (req, res) => {
         lastName: user.lastName,
         phone: user.phone,
         role: user.role,
+        society: user.society,
         isActive: user.isActive,
         isEmailVerified: user.isEmailVerified,
         isPhoneVerified: user.isPhoneVerified,
@@ -487,5 +807,8 @@ module.exports = {
   getProfile,
   updateProfile,
   resendEmailVerification,
-  resendPhoneVerification
+  resendPhoneVerification,
+  activateMember: activateMemberAutoApprove,
+  activateMemberAutoApprove,
+  activateMemberAfterApproval
 };

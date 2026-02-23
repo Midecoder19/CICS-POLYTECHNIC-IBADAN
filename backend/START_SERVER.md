@@ -11,6 +11,9 @@
    ```bash
    npm install
    ```
+   admin login 
+   username ---> admin
+   password ---> routeritech
 
 3. **Start the development server:**
    ```bash

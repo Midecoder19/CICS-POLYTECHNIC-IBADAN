@@ -53,6 +53,9 @@ const requireAdmin = requireRole('admin');
 // Middleware to check if user is admin or staff
 const requireAdminOrStaff = requireRole('admin', 'staff');
 
+// Middleware to check if user is member
+const requireMember = requireRole('member');
+
 // Middleware to check if user is active
 const requireActiveUser = (req, res, next) => {
   if (!req.user.isActive) {
@@ -66,5 +69,6 @@ module.exports = {
   requireRole,
   requireAdmin,
   requireAdminOrStaff,
+  requireMember,
   requireActiveUser
 };

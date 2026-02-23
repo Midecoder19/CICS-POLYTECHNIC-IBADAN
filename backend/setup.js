@@ -1,3 +1,4 @@
+// @ts-nocheck
 const fs = require('fs');
 const path = require('path');
 
@@ -94,8 +95,8 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'staff', 'member'],
-    default: 'member'
+    enum: ['admin', 'staff'], // 'member'
+    default: 'staff' // 'member'
   },
   email: {
     type: String,
@@ -303,7 +304,7 @@ const register = async (req, res) => {
       phone,
       firstName,
       lastName,
-      role: role || 'member'
+      role: role || 'staff' // 'member'
     });
 
     const emailToken = crypto.randomBytes(32).toString('hex');
@@ -631,8 +632,8 @@ const registerValidation = [
 
   body('role')
     .optional()
-    .isIn(['admin', 'staff', 'member'])
-    .withMessage('Role must be admin, staff, or member')
+    .isIn(['admin', 'staff']) // 'member'
+    .withMessage('Role must be admin or staff') // or member
 ];
 
 const loginValidation = [
@@ -745,7 +746,7 @@ const getDashboardStats = async (req, res) => {
 
     const adminCount = await User.countDocuments({ role: 'admin', isActive: true });
     const staffCount = await User.countDocuments({ role: 'staff', isActive: true });
-    const memberCount = await User.countDocuments({ role: 'member', isActive: true });
+    // const memberCount = await User.countDocuments({ role: 'member', isActive: true });
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -762,8 +763,8 @@ const getDashboardStats = async (req, res) => {
       },
       roles: {
         admin: adminCount,
-        staff: staffCount,
-        member: memberCount
+        staff: staffCount
+        // member: memberCount
       },
       financial: {
         totalSavings: 15420000,
@@ -1258,18 +1259,18 @@ const sampleUsers = [
     isPhoneVerified: true,
     isActive: true
   },
-  {
-    username: 'member1',
-    password: 'member123',
-    email: 'member@polyibadan.com',
-    phone: '+2348034567890',
-    firstName: 'Jane',
-    lastName: 'Member',
-    role: 'member',
-    isEmailVerified: true,
-    isPhoneVerified: true,
-    isActive: true
-  },
+  // {
+  //   username: 'member1',
+  //   password: 'member123',
+  //   email: 'member@polyibadan.com',
+  //   phone: '+2348034567890',
+  //   firstName: 'Jane',
+  //   lastName: 'Member',
+  //   role: 'member',
+  //   isEmailVerified: true,
+  //   isPhoneVerified: true,
+  //   isActive: true
+  // },
   {
     username: 'demo',
     password: 'demo',
@@ -1377,7 +1378,7 @@ function createDirectories() {
   dirs.forEach(dir => {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
-      console.log(\`📁 Created directory: \${dir}\`);
+    console.log('Created directory: ' + dir);
     }
   });
 }
@@ -1393,7 +1394,7 @@ function createFiles() {
     }
 
     fs.writeFileSync(fullPath, content, 'utf8');
-    console.log(\`📄 Created file: \${fullPath}\`);
+    console.log(`📄 Created file: ${fullPath}`);
   });
 }
 

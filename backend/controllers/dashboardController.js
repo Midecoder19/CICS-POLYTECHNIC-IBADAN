@@ -13,7 +13,7 @@ const getDashboardStats = async (req, res) => {
 
     const adminCount = await User.countDocuments({ role: 'admin', isActive: true });
     const staffCount = await User.countDocuments({ role: 'staff', isActive: true });
-    const memberCount = await User.countDocuments({ role: 'member', isActive: true });
+    // const memberCount = await User.countDocuments({ role: 'member', isActive: true }); // Commented out for now
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -31,7 +31,7 @@ const getDashboardStats = async (req, res) => {
       roles: {
         admin: adminCount,
         staff: staffCount,
-        member: memberCount
+        // member: memberCount // Commented out for now
       },
       financial: {
         totalSavings: 15420000,
@@ -48,7 +48,8 @@ const getDashboardStats = async (req, res) => {
 
     res.json({
       success: true,
-      data: stats
+      data: stats,
+      message: 'Dashboard statistics retrieved successfully'
     });
 
   } catch (error) {

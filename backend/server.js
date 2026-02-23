@@ -10,14 +10,36 @@ const app = express();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // Allow localhost origins
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      return callback(null, true);
+    }
+
+    // Allow any IP address on any port (for network access)
+    const url = new URL(origin);
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname)) {
+      return callback(null, true);
+    }
+
+    // Allow configured frontend URL
+    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+      return callback(null, true);
+    }
+
+    console.log('CORS blocked origin:', origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // Higher limit for development
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
@@ -26,10 +48,15 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
+// Routes - optimized order (most used first)
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/member', require('./routes/member'));
+app.use('/api/member', require('./routes/memberAuth')); // Member-specific auth routes
 app.use('/api/dashboard', require('./routes/dashboard'));
+app.use('/api/common', require('./routes/common_new'));
 app.use('/api/common/society', require('./routes/society'));
+app.use('/api/stock/sales', require('./routes/stockSales'));
+app.use('/api/account', require('./routes/organization'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -54,61 +81,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server on fixed port
-const PORT = process.env.PORT || 3003;
-const server = app.listen(PORT, () => {
+// Database connection
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/polyibadan')
+.then(() => console.log('✅ MongoDB connected'))
+.catch(err => console.error('❌ MongoDB connection error:', err));
+
+// Start server
+const PORT = 5000;
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📝 Health check: http://localhost:${PORT}/api/health`);
-}).on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} is already in use. Please free up the port or set a different PORT environment variable.`);
-    console.error(`💡 You can run: netstat -ano | findstr :${PORT} to find the process using the port`);
-    console.error(`💡 Then kill it with: taskkill /PID <PID> /F`);
-  } else {
-    console.error('Failed to start server:', err);
-  }
-  process.exit(1);
 });
-
-// Database connection with improved error handling
-const connectDB = async () => {
-  try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/polyibadan';
-    console.log('🔄 Attempting to connect to MongoDB...');
-    console.log(`📍 MongoDB URI: ${mongoURI.replace(/\/\/.*@/, '//***:***@')}`); // Hide credentials in logs
-
-    await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 10000, // Increased to 10s
-      socketTimeoutMS: 45000,
-    });
-
-    console.log('✅ MongoDB connected successfully');
-    
-    // Handle connection events
-    mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB connection error:', err.message);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('⚠️  MongoDB disconnected. Attempting to reconnect...');
-    });
-
-    mongoose.connection.on('reconnected', () => {
-      console.log('✅ MongoDB reconnected successfully');
-    });
-
-  } catch (err) {
-    console.error('❌ MongoDB connection error:', err.message);
-    console.log('⚠️  Server running without database connection. Some features may not work.');
-    console.log('💡 Make sure MongoDB is running or check your MONGODB_URI in .env file');
-    // Don't exit - allow server to run without DB for development
-  }
-};
-
-// Connect to database
-connectDB();
 
 module.exports = app;

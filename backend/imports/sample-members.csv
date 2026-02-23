@@ -1,0 +1,5 @@
+societycode,instcode,fileno,surname,firstname,middlename,gender,email,teleno,bankcode,openbal,presaddress,permaddress,depcode,kinname,kinaddress,kinteleno,kinrelation,maritalstatus,bankaccno
+SOC001,BR001,STU2024001,Smith,John,Doe,M,john.smith@email.com,08012345678,BANK001,5000.00,"123 Main St, Lagos","123 Main St, Lagos",DEPT001,"John Smith Sr","123 Main St, Lagos",08012345679,Father,Single,1234567890
+SOC001,BR001,STU2024002,Johnson,Mary,Jane,F,mary.j@email.com,08087654321,BANK001,3000.00,"456 Oak Ave, Lagos","456 Oak Ave, Lagos",DEPT002,"Mary Johnson Sr","456 Oak Ave, Lagos",08087654322,Mother,Married,2345678901
+SOC001,BR002,STU2024003,Williams,Robert,,M,robert.w@email.com,08098765432,BANK002,7500.50,"789 Pine Rd, Lagos","789 Pine Rd, Lagos",DEPT001,"Robert Williams Sr","789 Pine Rd, Lagos",08098765433,Father,Single,3456789012
+SOC002,BR001,TEA2024001,Brown,Sarah,Elizabeth,F,sarah.brown@email.com,08056789012,BANK001,2000.00,"321 Elm St, Lagos","321 Elm St, Lagos",DEPT003,"David Brown","321 Elm St, Lagos",08056789013,Husband,Married,4567890123

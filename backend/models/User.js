@@ -12,13 +12,22 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: false,
     minlength: [6, 'Password must be at least 6 characters long']
   },
   role: {
     type: String,
     enum: ['admin', 'staff', 'member'],
-    default: 'member'
+    default: 'staff'
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'approved' // Staff/admin are approved by default, members need approval
+  },
+  activated: {
+    type: Boolean,
+    default: false // For members - whether they've completed activation
   },
   email: {
     type: String,
@@ -40,6 +49,16 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
     maxlength: [20, 'Phone number cannot exceed 20 characters']
+  },
+  memberNumber: {
+    type: String,
+    trim: true,
+    unique: true,
+    sparse: true
+  },
+  society: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Society'
   },
   isActive: {
     type: Boolean,
@@ -75,7 +94,7 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password || /^\$2[aby]\$/.test(this.password)) return next();
 
   try {
     const salt = await bcrypt.genSalt(12);
@@ -97,5 +116,13 @@ userSchema.methods.toJSON = function() {
   delete userObject.password;
   return userObject;
 };
+
+// EXTREME PERFORMANCE INDEXES
+userSchema.index({ email: 1 }, { sparse: true }); // For email lookups
+userSchema.index({ role: 1, isActive: 1 }); // For role-based queries
+userSchema.index({ isActive: 1, createdAt: -1 }); // For active user queries
+userSchema.index({ 'emailVerificationToken': 1 }, { sparse: true }); // For token verification
+userSchema.index({ 'phoneVerificationToken': 1 }, { sparse: true }); // For token verification
+userSchema.index({ createdAt: -1 }); // For recent user queries
 
 module.exports = mongoose.model('User', userSchema);

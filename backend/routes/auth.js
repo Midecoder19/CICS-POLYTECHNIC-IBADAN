@@ -1,4 +1,4 @@
-const express = require('express');
+  const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const {
@@ -12,52 +12,16 @@ const {
   getProfile,
   updateProfile,
   resendEmailVerification,
-  resendPhoneVerification
+  resendPhoneVerification,
+  activateMemberAutoApprove
 } = require('../controllers/authController');
 const {
   authenticateToken,
-  requireActiveUser
+  requireActiveUser,
+  requireAdmin
 } = require('../middleware/auth');
 
 // Validation middleware
-const registerValidation = [
-  body('username')
-    .isLength({ min: 3, max: 50 })
-    .withMessage('Username must be between 3 and 50 characters')
-    .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage('Username can only contain letters, numbers, and underscores'),
-
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long'),
-
-  body('email')
-    .optional()
-    .isEmail()
-    .withMessage('Please provide a valid email address')
-    .normalizeEmail(),
-
-  body('phone')
-    .optional()
-    .matches(/^[\+]?[1-9][\d]{0,15}$/)
-    .withMessage('Please provide a valid phone number'),
-
-  body('firstName')
-    .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('First name must be between 1 and 50 characters'),
-
-  body('lastName')
-    .optional()
-    .isLength({ min: 1, max: 50 })
-    .withMessage('Last name must be between 1 and 50 characters'),
-
-  body('role')
-    .optional()
-    .isIn(['admin', 'staff', 'member'])
-    .withMessage('Role must be admin, staff, or member')
-];
-
 const loginValidation = [
   body('username')
     .notEmpty()
@@ -69,9 +33,15 @@ const loginValidation = [
 ];
 
 const emailVerificationValidation = [
-  body('token')
-    .notEmpty()
-    .withMessage('Verification token is required')
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email address')
+    .normalizeEmail(),
+  body('code')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('Verification code must be 6 digits')
+    .isNumeric()
+    .withMessage('Verification code must contain only numbers')
 ];
 
 const phoneVerificationValidation = [
@@ -139,6 +109,21 @@ const resendPhoneValidation = [
     .withMessage('Please provide a valid phone number')
 ];
 
+const activateMemberValidation = [
+  body('memberNumber')
+    .notEmpty()
+    .withMessage('Member ID is required')
+    .trim(),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long'),
+  body('verificationCode')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('Verification code must be 6 digits')
+    .isNumeric()
+    .withMessage('Verification code must contain only numbers')
+];
+
 // Middleware to handle validation errors
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -152,11 +137,12 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 // Public routes
-router.post('/register', registerValidation, handleValidationErrors, register);
+router.post('/register', register);
 router.post('/verify-email', emailVerificationValidation, handleValidationErrors, verifyEmail);
 router.post('/verify-phone', phoneVerificationValidation, handleValidationErrors, verifyPhone);
 router.post('/resend-email-verification', resendEmailValidation, handleValidationErrors, resendEmailVerification);
 router.post('/resend-phone-verification', resendPhoneValidation, handleValidationErrors, resendPhoneVerification);
+router.post('/activate-member', activateMemberValidation, handleValidationErrors, activateMemberAutoApprove);
 router.post('/login', loginValidation, handleValidationErrors, login);
 router.post('/forgot-password', forgotPasswordValidation, handleValidationErrors, forgotPassword);
 router.post('/reset-password', resetPasswordValidation, handleValidationErrors, resetPassword);
@@ -166,8 +152,8 @@ router.post('/refresh', refreshToken);
 router.get('/profile', authenticateToken, requireActiveUser, getProfile);
 router.put('/profile', authenticateToken, requireActiveUser, updateProfileValidation, handleValidationErrors, updateProfile);
 
-// Test routes for email and WhatsApp (remove in production)
-router.post('/test-email', async (req, res) => {
+// Test routes for email and WhatsApp (protected - admin only, remove in production)
+router.post('/test-email', authenticateToken, requireActiveUser, requireAdmin, async (req, res) => {
   try {
     const { sendVerificationEmail } = require('../utils/emailService');
     const { email } = req.body;
@@ -184,7 +170,7 @@ router.post('/test-email', async (req, res) => {
   }
 });
 
-router.post('/test-whatsapp', async (req, res) => {
+router.post('/test-whatsapp', authenticateToken, requireActiveUser, requireAdmin, async (req, res) => {
   try {
     const { sendVerificationWhatsApp } = require('../utils/smsService');
     const { phone } = req.body;
