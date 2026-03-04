@@ -5,7 +5,9 @@ const StockBalance = require('../models/StockBalance');
 const getProducts = async (req, res) => {
   try {
     const { society } = req.query;
-    const query = society ? { society } : {};
+    // If society is provided, return products for that society OR products without society (global)
+    // This ensures products are visible regardless of society assignment
+    const query = society ? { $or: [{ society }, { society: { $exists: false } }] } : {};
 
     const products = await Product.find(query)
       .populate('supplier', 'code name')

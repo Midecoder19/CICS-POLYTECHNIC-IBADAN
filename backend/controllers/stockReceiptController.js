@@ -155,14 +155,19 @@ const createStockReceipt = async (req, res) => {
       }));
     }
 
+    // Create the receipt
     const receipt = await StockReceipt.create({
       ...receiptData,
       createdBy: req.user.userId || req.user._id,
       updatedBy: req.user.userId || req.user._id
     });
 
-    // Update stock balances immediately (not waiting for approval)
-    await receipt.updateStockBalances();
+    // Update stock balances immediately
+    try {
+      await receipt.updateStockBalances();
+    } catch (balanceError) {
+      console.error('Error updating stock balances:', balanceError);
+    }
 
     const populatedReceipt = await StockReceipt.findById(receipt._id)
       .populate('society', 'code name')
@@ -268,11 +273,7 @@ const updateStockReceipt = async (req, res) => {
 // @access  Private (Admin/Staff)
 const deleteStockReceipt = async (req, res) => {
   try {
-    const receipt = await StockReceipt.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false, updatedBy: req.user.userId || req.user._id },
-      { new: true }
-    );
+    const receipt = await StockReceipt.findById(req.params.id);
 
     if (!receipt) {
       return res.status(404).json({
@@ -280,6 +281,13 @@ const deleteStockReceipt = async (req, res) => {
         message: 'Stock receipt not found'
       });
     }
+
+    // Reverse stock balances before marking as inactive
+    await receipt.reverseStockBalances();
+
+    receipt.isActive = false;
+    receipt.updatedBy = req.user.userId || req.user._id;
+    await receipt.save();
 
     res.json({
       success: true,
@@ -456,21 +464,22 @@ const getLatestReceiptPrice = async (req, res) => {
     const { society } = req.query;
 
     if (!society) {
-      return res.status(400).json({
-        success: false,
-        message: 'Society is required'
+      return res.json({
+        success: true,
+        data: {
+          unitPrice: 0,
+          stockBalance: 0,
+          lastReceiptDate: null,
+          receiptNumber: null
+        }
       });
     }
 
-    // Convert to ObjectId for proper comparison
-    const mongoose = require('mongoose');
     const productObjId = new mongoose.Types.ObjectId(productId);
     const societyObjId = new mongoose.Types.ObjectId(society);
 
-    // Find the latest approved receipt that contains this product
     const receipt = await StockReceipt.findOne({
       society: societyObjId,
-      status: 'approved',
       isActive: true,
       'items.product': productObjId
     })
@@ -494,19 +503,50 @@ const getLatestReceiptPrice = async (req, res) => {
       i.product && i.product.toString() === productId
     );
 
-    // Get current stock balance for this product
-    const StockBalance = require('../models/StockBalance');
-    const stockBalance = await StockBalance.findOne({
+    // Calculate stock balance from Stock Receipts - Stock Sales
+    const StockSales = require('../models/StockSales');
+    
+    // Get all receipts for this product
+    const receipts = await StockReceipt.find({
       society: societyObjId,
-      product: productObjId,
-      isActive: true
+      isActive: true,
+      'items.product': productObjId
+    }).select('items');
+    
+    // Get all sales for this product
+    const sales = await StockSales.find({
+      society: societyObjId,
+      isActive: true,
+      'items.product': productObjId
+    }).select('items');
+    
+    // Calculate total quantity from receipts
+    let totalReceiptQty = 0;
+    receipts.forEach(r => {
+      r.items.forEach(i => {
+        if (i.product && i.product.toString() === productId) {
+          totalReceiptQty += i.quantity || 0;
+        }
+      });
     });
+    
+    // Calculate total quantity from sales
+    let totalSalesQty = 0;
+    sales.forEach(s => {
+      s.items.forEach(i => {
+        if (i.product && i.product.toString() === productId) {
+          totalSalesQty += i.quantity || 0;
+        }
+      });
+    });
+    
+    const calculatedStockBalance = totalReceiptQty - totalSalesQty;
 
     res.json({
       success: true,
       data: {
         unitPrice: item ? item.unitPrice : 0,
-        stockBalance: stockBalance ? stockBalance.quantityOnHand : 0,
+        stockBalance: calculatedStockBalance,
         lastReceiptDate: receipt.receiptDate,
         receiptNumber: receipt.receiptNumber
       }

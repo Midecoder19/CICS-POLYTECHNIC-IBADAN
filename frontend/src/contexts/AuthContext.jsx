@@ -3,6 +3,7 @@ import AuthService from '../services/AuthService';
 
 const AuthContext = createContext({
   user: null,
+  loading: true,
   login: () => Promise.reject(new Error('AuthProvider not found')),
   register: () => Promise.reject(new Error('AuthProvider not found')),
   verifyEmail: () => Promise.reject(new Error('AuthProvider not found')),
@@ -21,6 +22,7 @@ export const useAuth = () => {
     // Return a default context to prevent crashes
     return {
       user: null,
+      loading: true,
       login: () => Promise.reject(new Error('AuthProvider not found')),
       register: () => Promise.reject(new Error('AuthProvider not found')),
       verifyEmail: () => Promise.reject(new Error('AuthProvider not found')),
@@ -37,15 +39,27 @@ export const useAuth = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null); // Don't load from localStorage on mount
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Clear authentication data on app start to require login on refresh
+  // Load user from localStorage on mount (after initial render)
   useEffect(() => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('memberToken');
-    localStorage.removeItem('memberUser');
+    const loadUser = () => {
+      try {
+        const storedUser = localStorage.getItem('user');
+        const token = localStorage.getItem('token');
+        if (storedUser && token) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+        }
+      } catch (error) {
+        console.error('Error loading user from localStorage:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadUser();
   }, []);
 
   const login = async (username, password) => {
@@ -93,6 +107,7 @@ export const AuthProvider = ({ children }) => {
 
   const value = {
     user,
+    loading,
     login,
     register,
     verifyEmail,

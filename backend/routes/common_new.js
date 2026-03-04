@@ -52,7 +52,7 @@ router.put('/stock-receipts/:id', authenticateToken, requireActiveUser, requireA
 router.delete('/stock-receipts/:id', authenticateToken, requireActiveUser, requireAdminOrStaff, stockReceiptController.deleteStockReceipt);
 router.put('/stock-receipts/:id/approve', authenticateToken, requireActiveUser, requireAdminOrStaff, stockReceiptController.approveStockReceipt);
 router.get('/stock-receipts/summary', authenticateToken, requireActiveUser, stockReceiptController.getStockReceiptSummary);
-router.get('/stock-receipts/latest-price/:productId', authenticateToken, requireActiveUser, stockReceiptController.getLatestReceiptPrice);
+router.get('/stock-receipts/latest-price/:productId', stockReceiptController.getLatestReceiptPrice);
 
 // Stock Balance routes
 router.get('/stock-balances', authenticateToken, requireActiveUser, stockBalanceController.getStockBalances);

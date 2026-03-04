@@ -5,9 +5,10 @@ const DefaultParameter = require('../models/DefaultParameter');
 const getSuppliers = async (req, res) => {
   try {
     const { society } = req.query;
-    const query = { isActive: true };
+    // If society is provided, return suppliers for that society OR suppliers without society (global)
+    let query = { isActive: true };
     if (society) {
-      query.society = society;
+      query.$or = [{ society }, { society: { $exists: false } }];
     }
     const suppliers = await Supplier.find(query)
       .sort({ code: 1 });

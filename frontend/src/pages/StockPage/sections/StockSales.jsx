@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import { Plus, Save, RotateCcw, Loader, Trash2, Printer, Check, X, Search, Key } from "lucide-react";
+import { Plus, Save, RotateCcw, Loader, Trash2, Printer, Search, Key } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContext.jsx";
 import stockSalesService from "../../../services/StockSalesService.js";
 import StoreLookupModal from "../../CommonPage/sections/StoreLookupModal";
@@ -9,6 +9,9 @@ import ProductLookupModal from "../../CommonPage/sections/ProductLookupModal";
 import MemberLookupModal from "../../CommonPage/sections/MemberLookupModal";
 import { api } from "../../../config/api.js";
 import "../../../styles/StockSales.css";
+import "../../../styles/StockSales.css";
+
+
 
 const StockSales = () => {
   const navigate = useNavigate();
@@ -30,7 +33,7 @@ const StockSales = () => {
     stockBalance: 0,
     minimumLevel: 0,
     status: "active",
-    society: user?.society?._id || user?.society,
+    society: user?.society?._id || user?.society || '',
     totalAmount: 0,
     totalQuantity: 0,
   }), [user]);
@@ -82,25 +85,51 @@ const StockSales = () => {
   }, [items, headerData.discountAmount, headerData.vatAmount]);
 
   useEffect(() => {
-    if (user?.society) {
+    // Wait for user to be loaded
+    if (!user) {
+      return;
+    }
+    
+    if (user.society) {
       loadInitialData();
     } else {
       setError("User society not found. Please log in again.");
       setLoading({ page: false, action: false });
     }
-  }, [user?.society]);
+  }, [user]);
 
   const loadInitialData = async () => {
     setLoading({ page: true, action: false });
     try {
-      const societyId = user.society._id || user.society;
+      console.log('User object:', user);
+      let societyId = user?.society?._id || user?.society;
+      console.log('Loading stock sales data for society:', societyId);
+      
+      if (!societyId) {
+        console.warn('User society not found, trying to get from localStorage');
+        // Try to get society from localStorage as fallback
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          societyId = parsedUser?.society?._id || parsedUser?.society;
+          console.log('Society from localStorage:', societyId);
+        }
+      }
+      
+      if (!societyId) {
+        throw new Error("User society not found. Please contact administrator to assign a society.");
+      }
+
+      console.log('Calling APIs...');
+      
+      // Call all APIs
       const [storesRes, productsRes, membersRes, stockBalancesRes] = await Promise.all([
         stockSalesService.getStores(societyId),
         stockSalesService.getProducts(societyId),
-        stockSalesService.getMembers(societyId),
-        stockSalesService.getStockBalances(societyId),
+        stockSalesService.getMembers(societyId).catch(err => ({ success: false, data: [], message: err.message })),
+        stockSalesService.getStockBalances(societyId)
       ]);
-
+      
       if (storesRes.success) setStores(storesRes.data || []);
       else throw new Error("Failed to load stores: " + storesRes.message);
 
@@ -116,17 +145,50 @@ const StockSales = () => {
 
       // Build stock balance lookup by product ID
       if (stockBalancesRes.success && stockBalancesRes.data) {
+        console.log('Stock balances data:', stockBalancesRes.data);
         const balances = {};
         stockBalancesRes.data.forEach(balance => {
-          balances[balance.product?._id || balance.product] = balance.quantityOnHand || 0;
+          const productId = balance.product?._id?.toString() || balance.product?.toString();
+          balances[productId] = balance.quantityOnHand || 0;
+          console.log('Product', productId, 'balance:', balance.quantityOnHand);
         });
         setStockBalances(balances);
+      } else {
+        console.error('Failed to load stock balances:', stockBalancesRes);
       }
 
     } catch (err) {
       setError(err.message || "Failed to load initial data.");
     } finally {
       setLoading({ page: false, action: false });
+    }
+  };
+
+  // Reload stock balances from server
+  const loadStockBalances = async () => {
+    try {
+      let societyId = user?.society?._id || user?.society;
+      if (!societyId) {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          societyId = parsedUser?.society?._id || parsedUser?.society;
+        }
+      }
+      
+      if (!societyId) return;
+      
+      const stockBalancesRes = await stockSalesService.getStockBalances(societyId);
+      if (stockBalancesRes.success && stockBalancesRes.data) {
+        const balances = {};
+        stockBalancesRes.data.forEach(balance => {
+          const productId = balance.product?._id?.toString() || balance.product?.toString();
+          balances[productId] = balance.quantityOnHand || 0;
+        });
+        setStockBalances(balances);
+      }
+    } catch (err) {
+      console.error('Failed to reload stock balances:', err);
     }
   };
 
@@ -207,6 +269,8 @@ const StockSales = () => {
           });
           setItems(result.data.items || []);
         }
+        // Reload stock balances from server to reflect the updated stock
+        await loadStockBalances();
       } else {
         throw new Error(result.message || `Failed to ${headerData._id ? 'update' : 'create'} sale.`);
       }
@@ -258,7 +322,8 @@ const StockSales = () => {
       const printWindow = window.open('', '_blank');
       const itemsHtml = items.map(item =>
         '<tr>' +
-          '<td>' + item.productCode + '</td>' +
+          '<td>' + (item.productCode || '') + '</td>' +
+          '<td>' + (item.description || item.productName || '-') + '</td>' +
           '<td>' + item.quantity + '</td>' +
           '<td style="text-align: right;">' + (item.unitPrice?.toFixed(2) || '0.00') + '</td>' +
           '<td style="text-align: right;">' + (item.extendedAmount?.toFixed(2) || '0.00') + '</td>' +
@@ -284,6 +349,7 @@ const StockSales = () => {
             '<div class="center">Date: ' + new Date(headerData.issueDate).toLocaleDateString() + '</div>' +
             '<hr>' +
             '<table>' +
+              '<tr><th>Code</th><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th></tr>' +
               itemsHtml +
             '</table>' +
             '<div class="total">' +
@@ -303,38 +369,6 @@ const StockSales = () => {
     }
   };
 
-  const handleApprovalAction = async (action) => {
-    if (!headerData._id) {
-      setError("No sale loaded to perform this action.");
-      return;
-    }
-
-    const isApproving = action === 'approve';
-    let reason = '';
-    if (!isApproving) {
-      reason = prompt("Please provide a reason for rejection:");
-      if (reason === null) return; // User cancelled prompt
-    }
-
-    setLoading({ ...loading, action: true });
-    try {
-      const result = isApproving
-        ? await stockSalesService.approveStockSale(headerData._id)
-        : await stockSalesService.rejectStockSale(headerData._id, reason);
-
-      if (result.success) {
-        setSuccess(`Sale ${action}d successfully.`);
-        // Refresh sale data
-        handleSearchSiv();
-      } else {
-        throw new Error(result.message || `Failed to ${action} sale.`);
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading({ ...loading, action: false });
-    }
-  };
 
   const handleHeaderChange = (e) => {
     const { name, value } = e.target;
@@ -438,18 +472,21 @@ const StockSales = () => {
     setShowProductLookup(true);
   };
 
-  const handleProductSelectForEntry = (product) => {
-    // Use the stock balance from the stockBalances lookup that's already loaded
-    const stockBalance = stockBalances[product._id] || 0;
+  const handleProductSelectForEntry = async (product) => {
+    // Get product ID as string for consistent matching
+    const productId = product._id?.toString();
     
-    // Get price from product sellingPrice or price
-    const unitPrice = product.sellingPrice || product.price || 0;
+    // Get stock balance from availableStock (passed from ProductLookupModal) or from local state
+    let stockBalance = product.availableStock || stockBalances[productId] || 0;
+    
+    let unitPrice = product.sellingPrice || product.price || 0;
+    let measure = product.unit || 'Piece';
     
     setCurrentItem({
-      product: product._id,
+      product: productId,
       productCode: product.code,
       description: product.description || product.name,
-      measure: product.unit || product.measure || 'Piece',
+      measure: measure,
       bulk: 0,
       bulkPrice: product.bulkPrice || 0,
       pieces: 0,
@@ -458,6 +495,7 @@ const StockSales = () => {
       extendedAmount: 0,
       availableStock: stockBalance
     });
+    
     setShowProductLookup(false);
   };
 
@@ -496,7 +534,8 @@ const StockSales = () => {
     }
     
     // Check stock availability
-    const availableStock = currentItem.availableStock || stockBalances[currentItem.product] || 0;
+    const productKey = currentItem.product?.toString();
+    const availableStock = currentItem.availableStock || stockBalances[productKey] || 0;
     if (currentItem.quantity > availableStock) {
       setError(`Insufficient stock. Available: ${availableStock}, Requested: ${currentItem.quantity}`);
       return;
@@ -507,6 +546,13 @@ const StockSales = () => {
     
     // Add to items array with calculated extended amount
     setItems([...items, { ...currentItem, extendedAmount }]);
+    
+    // Update stock balances - subtract the sold quantity
+    const updatedBalances = { ...stockBalances };
+    if (updatedBalances[productKey] !== undefined) {
+      updatedBalances[productKey] = Math.max(0, updatedBalances[productKey] - currentItem.quantity);
+    }
+    setStockBalances(updatedBalances);
     
     // Reset current item
     setCurrentItem({
@@ -520,16 +566,15 @@ const StockSales = () => {
       quantity: 1,
       unitPrice: 0,
       extendedAmount: 0,
-      availableStock: 0
+      availableStock: updatedBalances[productKey] || 0
     });
     
-    setSuccess('Item added to spreadsheet.');
+    setSuccess('Item added to spreadsheet. Stock updated.');
   };
 
   if (loading.page) return <div className="loading-indicator"><Loader className="animate-spin" /> Loading Page...</div>;
 
   const canEdit = headerData.status === 'draft' || user.role === 'admin';
-  const canApprove = user.role === 'admin' && headerData.status === 'pending';
 
   return (
     <div className="srv-page">
@@ -550,12 +595,6 @@ const StockSales = () => {
         <button onClick={handleSave} disabled={!canEdit || loading.action}><Save size={16} /> Update</button>
         <button onClick={handleDelete} disabled={!headerData._id || !canEdit || loading.action}><Trash2 size={16} /> Delete</button>
         <button onClick={handlePrint}><Printer size={16} /> Print</button>
-        {canApprove && (
-          <>
-            <button onClick={() => handleApprovalAction('approve')} disabled={loading.action}><Check size={16} /> Approve</button>
-            <button onClick={() => handleApprovalAction('reject')} disabled={loading.action}><X size={16} /> Reject</button>
-          </>
-        )}
       </div>
 
       {/* HEADER PANEL */}
@@ -642,7 +681,7 @@ const StockSales = () => {
             </div>
             <div className="form-group">
               <label>Available Stock</label>
-              <input type="text" value={currentItem.availableStock || stockBalances[currentItem.product] || 0} readOnly style={{ backgroundColor: '#e3f2fd', fontWeight: 'bold', color: (currentItem.availableStock || stockBalances[currentItem.product] || 0) > 0 ? '#28a745' : '#dc3545' }} />
+              <input type="text" value={currentItem.availableStock || stockBalances[currentItem.product?.toString()] || 0} readOnly style={{ backgroundColor: '#e3f2fd', fontWeight: 'bold', color: (currentItem.availableStock || stockBalances[currentItem.product?.toString()] || 0) > 0 ? '#28a745' : '#dc3545' }} />
             </div>
             <div className="form-group">
               <label>Measure</label>
@@ -726,7 +765,7 @@ const StockSales = () => {
                   <td><input type="text" value={item.productCode} readOnly /></td>
                   <td><input type="text" value={item.description} readOnly /></td>
                   <td><input type="text" value={item.measure} readOnly /></td>
-                  <td><input type="text" value={item.availableStock || stockBalances[item.product] || 0} readOnly style={{ backgroundColor: '#e3f2fd', fontWeight: 'bold' }} /></td>
+                  <td><input type="text" value={item.availableStock || stockBalances[item.product?.toString()] || 0} readOnly style={{ backgroundColor: '#e3f2fd', fontWeight: 'bold' }} /></td>
                   <td><input type="number" value={(item.measure === 'Piece' || item.measure === 'Pack') ? '' : (item.bulk || 0)} onChange={(e) => handleInlineEdit(item, 'bulk', e.target.value)} disabled={!canEdit || item.measure === 'Piece' || item.measure === 'Pack'} step="0.01" placeholder={item.measure === 'Piece' || item.measure === 'Pack' ? '-' : ''} /></td>
                   <td><input type="text" value={item.bulkPrice ? item.bulkPrice.toFixed(2) : '-'} readOnly /></td>
                   <td><input type="number" value={item.quantity || 0} readOnly /></td>

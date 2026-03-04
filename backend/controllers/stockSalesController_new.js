@@ -173,8 +173,12 @@ const createStockSale = async (req, res) => {
     const stockSale = await StockSales.create({
       ...saleData,
       createdBy: req.user._id,
-      updatedBy: req.user._id
+      updatedBy: req.user._id,
+      status: 'approved' // Auto-approve - stock is updated immediately
     });
+
+    // Auto-update stock balances when sale is created
+    await stockSale.updateStockBalances();
 
     const populatedSale = await StockSales.findById(stockSale._id)
       .populate('society', 'code name')
@@ -357,205 +361,13 @@ const searchStockSales = async (req, res) => {
   }
 };
 
-// @desc    Post stock sale (mark as completed and generate receipt)
-// @route   PUT /api/stock/sales/:id/post
-// @access  Private (Admin/Staff)
-const postStockSale = async (req, res) => {
-  try {
-    const stockSale = await StockSales.findById(req.params.id);
+// Post stock sale - REMOVED
+// Stock is updated automatically on save
 
-    if (!stockSale) {
-      return res.status(404).json({
-        success: false,
-        message: 'Stock sale not found'
-      });
-    }
+// Approve stock sale - REMOVED
+// Stock is now updated automatically when sale is created
 
-    if (stockSale.status === 'completed') {
-      return res.status(400).json({
-        success: false,
-        message: 'Stock sale is already posted'
-      });
-    }
-
-    stockSale.status = 'completed';
-    stockSale._updatedBy = req.user._id;
-    await stockSale.save();
-
-    const updatedSale = await StockSales.findById(req.params.id)
-      .populate('createdBy', 'username firstName lastName')
-      .populate('updatedBy', 'username firstName lastName');
-
-    res.json({
-      success: true,
-      message: 'Stock sale posted successfully',
-      data: updatedSale
-    });
-  } catch (error) {
-    console.error('Post stock sale error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while posting stock sale'
-    });
-  }
-};
-
-// @desc    Approve stock sale
-// @route   PUT /api/stock/sales/:id/approve
-// @access  Private (Admin/Staff)
-const approveStockSale = async (req, res) => {
-  try {
-    const stockSale = await StockSales.findById(req.params.id);
-
-    if (!stockSale) {
-      return res.status(404).json({
-        success: false,
-        message: 'Stock sale not found'
-      });
-    }
-
-    if (stockSale.status === 'approved') {
-      return res.status(400).json({
-        success: false,
-        message: 'Stock sale is already approved'
-      });
-    }
-
-    // Validate stock availability before approval
-    const StockBalance = mongoose.model('StockBalance');
-    const insufficientStock = [];
-
-    for (const item of stockSale.items) {
-      const stockBalance = await StockBalance.findOne({
-        society: stockSale.society,
-        product: item.product,
-        isActive: true
-      });
-
-      if (!stockBalance || stockBalance.quantityOnHand < item.quantity) {
-        const available = stockBalance ? stockBalance.quantityOnHand : 0;
-        insufficientStock.push({
-          productCode: item.productCode,
-          productName: item.productName,
-          requested: item.quantity,
-          available: available
-        });
-      }
-    }
-
-    if (insufficientStock.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Insufficient stock for approval',
-        insufficientStock: insufficientStock
-      });
-    }
-
-    // Validate store exists
-    const store = await StoreInformation.findById(stockSale.store);
-    if (!store) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid store selected'
-      });
-    }
-
-    // Validate all products exist and have correct codes
-    for (const item of stockSale.items) {
-      const product = await Product.findById(item.product);
-      if (!product) {
-        return res.status(400).json({
-          success: false,
-          message: `Product ${item.productCode} not found`
-        });
-      }
-      if (product.code !== item.productCode) {
-        return res.status(400).json({
-          success: false,
-          message: `Product code mismatch for ${item.productName}`
-        });
-      }
-    }
-
-    // Update status and update stock balances using TWS logic
-    stockSale.status = 'approved';
-    stockSale.approvedBy = req.user.userId || req.user._id;
-    stockSale.approvedAt = new Date();
-    stockSale.updatedBy = req.user.userId || req.user._id;
-
-    await stockSale.updateStockBalances();
-
-    const updatedSale = await StockSales.findById(stockSale._id)
-      .populate('society', 'code name')
-      .populate('financialPeriod', 'periodNumber description')
-      .populate('createdBy', 'username firstName lastName')
-      .populate('updatedBy', 'username firstName lastName')
-      .populate('approvedBy', 'username firstName lastName');
-
-    res.json({
-      success: true,
-      message: 'Stock sale approved and stock balances updated successfully',
-      data: updatedSale
-    });
-  } catch (error) {
-    console.error('Approve stock sale error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while approving stock sale'
-    });
-  }
-};
-
-// @desc    Reject stock sale
-// @route   PUT /api/stock/sales/:id/reject
-// @access  Private (Admin/Staff)
-const rejectStockSale = async (req, res) => {
-  try {
-    const { rejectionReason } = req.body;
-    const stockSale = await StockSales.findById(req.params.id);
-
-    if (!stockSale) {
-      return res.status(404).json({
-        success: false,
-        message: 'Stock sale not found'
-      });
-    }
-
-    if (stockSale.status === 'rejected') {
-      return res.status(400).json({
-        success: false,
-        message: 'Stock sale is already rejected'
-      });
-    }
-
-    stockSale.status = 'rejected';
-    stockSale.rejectedBy = req.user._id;
-    stockSale.rejectedAt = new Date();
-    stockSale.rejectionReason = rejectionReason;
-    stockSale.updatedBy = req.user._id;
-
-    await stockSale.save();
-
-    const updatedSale = await StockSales.findById(stockSale._id)
-      .populate('society', 'code name')
-      .populate('financialPeriod', 'periodNumber description')
-      .populate('createdBy', 'username firstName lastName')
-      .populate('updatedBy', 'username firstName lastName')
-      .populate('rejectedBy', 'username firstName lastName');
-
-    res.json({
-      success: true,
-      message: 'Stock sale rejected successfully',
-      data: updatedSale
-    });
-  } catch (error) {
-    console.error('Reject stock sale error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while rejecting stock sale'
-    });
-  }
-};
+// Reject stock sale - REMOVED
 
 // @desc    Get stock sales summary
 // @route   GET /api/stock/sales/summary
@@ -643,8 +455,5 @@ module.exports = {
   updateStockSale,
   deleteStockSale,
   searchStockSales,
-  postStockSale,
-  approveStockSale,
-  rejectStockSale,
   getStockSalesSummary
 };

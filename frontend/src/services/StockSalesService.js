@@ -76,59 +76,6 @@ class StockSalesService {
     }
   }
 
-  // Post stock sale (complete transaction)
-  async postStockSale(id, saleData) {
-    try {
-      const response = await apiClient.put(`${API_ENDPOINTS.STOCK.SALES}/${id}/post`, saleData);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error posting stock sale:', error);
-      throw error;
-    }
-  }
-
-  // Approve stock sale
-  async approveStockSale(id) {
-    try {
-      const response = await apiClient.put(`${API_ENDPOINTS.STOCK.SALES}/${id}/approve`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error approving stock sale:', error);
-      throw error;
-    }
-  }
-
-  // Reject stock sale
-  async rejectStockSale(id, rejectionReason) {
-    try {
-      const response = await apiClient.put(`${API_ENDPOINTS.STOCK.SALES}/${id}/reject`, { rejectionReason });
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error rejecting stock sale:', error);
-      throw error;
-    }
-  }
-
-  // Get stock sales summary
-  async getStockSalesSummary(societyId = null, startDate = null, endDate = null) {
-    try {
-      const params = {};
-      if (societyId) params.society = societyId;
-      if (startDate) params.startDate = startDate;
-      if (endDate) params.endDate = endDate;
-
-      const response = await apiClient.get(`${API_ENDPOINTS.STOCK.SALES}/summary`, { params });
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error('Error fetching stock sales summary:', error);
-      throw error;
-    }
-  }
-
   // Search stock sales
   async searchStockSales(query, societyId = null) {
     try {
@@ -152,7 +99,7 @@ class StockSalesService {
       const data = await response.json();
       return {
         success: true,
-        data: data.data, // The controller returns data inside a data property
+        data: data.data,
         message: 'Stores loaded successfully'
       };
     } catch (error) {
@@ -174,7 +121,7 @@ class StockSalesService {
       const data = await response.json();
       return {
         success: true,
-        data: data.data, // The controller returns data inside a data property
+        data: data.data,
         message: 'Products loaded successfully'
       };
     } catch (error) {
@@ -190,11 +137,9 @@ class StockSalesService {
   // Get members for dropdown
   async getMembers(societyId = null) {
     try {
-      // Fetch members without society filter since imported members may not have society assigned
       const params = { role: 'member' };
       const response = await apiClient.get('/common/members', { params });
       const data = await response.json();
-      // Handle the response structure
       if (data.success && data.data && data.data.users) {
         return {
           success: true,

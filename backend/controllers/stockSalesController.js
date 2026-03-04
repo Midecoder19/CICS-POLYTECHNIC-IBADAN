@@ -171,8 +171,12 @@ const createStockSale = async (req, res) => {
     const stockSale = await StockSales.create({
       ...saleData,
       createdBy: req.user.userId || req.user._id,
-      updatedBy: req.user.userId || req.user._id
+      updatedBy: req.user.userId || req.user._id,
+      status: 'approved' // Auto-approve - stock is updated immediately
     });
+
+    // Auto-update stock balances when sale is created
+    await stockSale.updateStockBalances();
 
     const populatedSale = await StockSales.findById(stockSale._id)
       .populate('society', 'code name')
@@ -206,21 +210,7 @@ const createStockSale = async (req, res) => {
 // @access  Private (Admin/Staff)
 const updateStockSale = async (req, res) => {
   try {
-    const {
-      store,
-      sivNo,
-      issueDate,
-      memberNo,
-      fullName,
-      discountRate,
-      vatRate,
-      discountAmount,
-      stockBalance,
-      minimumLevel,
-      status,
-      items,
-      totals
-    } = req.body;
+    const updateData = { ...req.body };
 
     const stockSale = await StockSales.findById(req.params.id);
 
@@ -232,9 +222,9 @@ const updateStockSale = async (req, res) => {
     }
 
     // Check if SIV No is being changed and if it conflicts
-    if (sivNo && sivNo.trim() !== stockSale.sivNo) {
+    if (updateData.sivNo && updateData.sivNo.trim() !== stockSale.sivNo) {
       const existingSale = await StockSales.findOne({
-        sivNo: sivNo.trim(),
+        sivNo: updateData.sivNo.trim(),
         isActive: true,
         _id: { $ne: req.params.id }
       });
@@ -247,25 +237,27 @@ const updateStockSale = async (req, res) => {
       }
     }
 
-    stockSale._updatedBy = req.user._id;
+    // Recalculate extended amounts if items are updated
+    if (updateData.items && updateData.items.length > 0) {
+      updateData.items = updateData.items.map(item => ({
+        ...item,
+        extendedAmount: item.quantity * item.unitPrice
+      }));
+    }
 
-    stockSale.store = store || stockSale.store;
-    stockSale.sivNo = sivNo ? sivNo.trim() : stockSale.sivNo;
-    stockSale.issueDate = issueDate || stockSale.issueDate;
-    stockSale.memberNo = memberNo !== undefined ? memberNo : stockSale.memberNo;
-    stockSale.fullName = fullName !== undefined ? fullName : stockSale.fullName;
-    stockSale.discountRate = discountRate !== undefined ? discountRate : stockSale.discountRate;
-    stockSale.vatRate = vatRate !== undefined ? vatRate : stockSale.vatRate;
-    stockSale.discountAmount = discountAmount !== undefined ? discountAmount : stockSale.discountAmount;
-    stockSale.stockBalance = stockBalance !== undefined ? stockBalance : stockSale.stockBalance;
-    stockSale.minimumLevel = minimumLevel !== undefined ? minimumLevel : stockSale.minimumLevel;
-    stockSale.status = status || stockSale.status;
-    stockSale.items = items || stockSale.items;
-    stockSale.totals = totals || stockSale.totals;
+    // Update fields
+    Object.assign(stockSale, updateData, {
+      updatedBy: req.user.userId || req.user._id
+    });
 
     await stockSale.save();
 
+    // Update stock balances after sale update
+    await stockSale.updateStockBalances();
+
     const updatedSale = await StockSales.findById(req.params.id)
+      .populate('society', 'code name')
+      .populate('financialPeriod', 'periodNumber description')
       .populate('createdBy', 'username firstName lastName')
       .populate('updatedBy', 'username firstName lastName');
 
@@ -305,13 +297,16 @@ const deleteStockSale = async (req, res) => {
       });
     }
 
+    // Reverse stock balances before marking as inactive
+    await stockSale.reverseStockBalances();
+
     stockSale.isActive = false;
     stockSale._updatedBy = req.user._id;
     await stockSale.save();
 
     res.json({
       success: true,
-      message: 'Stock sale deleted successfully'
+      message: 'Sale deleted successfully and stock restored'
     });
   } catch (error) {
     console.error('Delete stock sale error:', error);
@@ -355,39 +350,13 @@ const searchStockSales = async (req, res) => {
   }
 };
 
-// @desc    Post stock sale (mark as completed and generate receipt)
-// @route   PUT /api/stock/sales/:id/post
-// @access  Private (Admin/Staff)
+// Post stock sale (mark as completed and generate receipt)
+// NOTE: This functionality is disabled - stock is updated on save directly
 const postStockSale = async (req, res) => {
   try {
-    const stockSale = await StockSales.findById(req.params.id);
-
-    if (!stockSale) {
-      return res.status(404).json({
-        success: false,
-        message: 'Stock sale not found'
-      });
-    }
-
-    if (stockSale.status === 'completed') {
-      return res.status(400).json({
-        success: false,
-        message: 'Stock sale is already posted'
-      });
-    }
-
-    stockSale.status = 'completed';
-    stockSale._updatedBy = req.user._id;
-    await stockSale.save();
-
-    const updatedSale = await StockSales.findById(req.params.id)
-      .populate('createdBy', 'username firstName lastName')
-      .populate('updatedBy', 'username firstName lastName');
-
-    res.json({
-      success: true,
-      message: 'Stock sale posted successfully',
-      data: updatedSale
+    res.status(400).json({
+      success: false,
+      message: 'Post functionality has been removed. Stock is updated automatically on save.'
     });
   } catch (error) {
     console.error('Post stock sale error:', error);
@@ -398,106 +367,10 @@ const postStockSale = async (req, res) => {
   }
 };
 
-// @desc    Approve stock sale
-// @route   PUT /api/stock/sales/:id/approve
-// @access  Private (Admin/Staff)
-const approveStockSale = async (req, res) => {
-  try {
-    const stockSale = await StockSales.findById(req.params.id);
+// Approve stock sale - REMOVED
+// Stock is now updated automatically when sale is created/updated
 
-    if (!stockSale) {
-      return res.status(404).json({
-        success: false,
-        message: 'Stock sale not found'
-      });
-    }
-
-    if (stockSale.status === 'approved') {
-      return res.status(400).json({
-        success: false,
-        message: 'Stock sale is already approved'
-      });
-    }
-
-    // Update status and update stock balances using TWS logic
-    stockSale.status = 'approved';
-    stockSale.approvedBy = req.user.userId || req.user._id;
-    stockSale.approvedAt = new Date();
-    stockSale.updatedBy = req.user.userId || req.user._id;
-
-    await stockSale.updateStockBalances();
-
-    const updatedSale = await StockSales.findById(stockSale._id)
-      .populate('society', 'code name')
-      .populate('financialPeriod', 'periodNumber description')
-      .populate('createdBy', 'username firstName lastName')
-      .populate('updatedBy', 'username firstName lastName')
-      .populate('approvedBy', 'username firstName lastName');
-
-    res.json({
-      success: true,
-      message: 'Stock sale approved and stock balances updated successfully',
-      data: updatedSale
-    });
-  } catch (error) {
-    console.error('Approve stock sale error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while approving stock sale'
-    });
-  }
-};
-
-// @desc    Reject stock sale
-// @route   PUT /api/stock/sales/:id/reject
-// @access  Private (Admin/Staff)
-const rejectStockSale = async (req, res) => {
-  try {
-    const { rejectionReason } = req.body;
-    const stockSale = await StockSales.findById(req.params.id);
-
-    if (!stockSale) {
-      return res.status(404).json({
-        success: false,
-        message: 'Stock sale not found'
-      });
-    }
-
-    if (stockSale.status === 'rejected') {
-      return res.status(400).json({
-        success: false,
-        message: 'Stock sale is already rejected'
-      });
-    }
-
-    stockSale.status = 'rejected';
-    stockSale.rejectedBy = req.user.userId || req.user._id;
-    stockSale.rejectedAt = new Date();
-    stockSale.rejectionReason = rejectionReason;
-    stockSale.updatedBy = req.user.userId || req.user._id;
-
-    await stockSale.save();
-
-    const updatedSale = await StockSales.findById(stockSale._id)
-      .populate('society', 'code name')
-      .populate('financialPeriod', 'periodNumber description')
-      .populate('createdBy', 'username firstName lastName')
-      .populate('updatedBy', 'username firstName lastName')
-      .populate('rejectedBy', 'username firstName lastName');
-
-    res.json({
-      success: true,
-      message: 'Stock sale rejected successfully',
-      data: updatedSale
-    });
-  } catch (error) {
-    console.error('Reject stock sale error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while rejecting stock sale'
-    });
-  }
-};
+// Reject stock sale - REMOVED
 
 // @desc    Get stock sales summary
 // @route   GET /api/stock/sales/summary
@@ -584,9 +457,5 @@ module.exports = {
   createStockSale,
   updateStockSale,
   deleteStockSale,
-  searchStockSales,
-  postStockSale,
-  approveStockSale,
-  rejectStockSale,
-  getStockSalesSummary
+  searchStockSales
 };

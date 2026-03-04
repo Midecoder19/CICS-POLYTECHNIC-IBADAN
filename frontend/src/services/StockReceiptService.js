@@ -74,6 +74,20 @@ class StockReceiptService {
     }
   }
 
+  // Update product purchase price
+  async updateProductPrice(productId, newPrice) {
+    try {
+      const response = await apiClient.put(`/common/products/${productId}`, {
+        purchasePrice: newPrice
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error updating product price:', error);
+      throw error;
+    }
+  }
+
   // Get stock receipt summary
   async getStockReceiptSummary(filters = {}) {
     try {

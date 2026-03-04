@@ -14,7 +14,7 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    // Allow localhost origins
+    // Allow localhost origins on any port
     if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
       return callback(null, true);
     }
@@ -87,7 +87,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/polyibada
 .catch(err => console.error('❌ MongoDB connection error:', err));
 
 // Start server
-const PORT = 5000;
+const PORT = 3003;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);

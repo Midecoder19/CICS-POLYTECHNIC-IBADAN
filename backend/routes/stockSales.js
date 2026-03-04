@@ -7,12 +7,8 @@ const {
   createStockSale,
   updateStockSale,
   deleteStockSale,
-  searchStockSales,
-  postStockSale,
-  approveStockSale,
-  rejectStockSale,
-  getStockSalesSummary
-} = require('../controllers/stockSalesController_new');
+  searchStockSales
+} = require('../controllers/stockSalesController');
 
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
@@ -29,12 +25,8 @@ router.route('/:id')
   .put(requireRole('admin', 'staff'), updateStockSale)
   .delete(requireRole('admin'), deleteStockSale);
 
-// Special routes
+// Special routes - search only (approval removed)
 router.get('/siv/:sivNo', getStockSaleBySivNo);
 router.get('/search/:query', searchStockSales);
-router.put('/:id/post', requireRole('admin', 'staff'), postStockSale);
-router.put('/:id/approve', requireRole('admin', 'staff'), approveStockSale);
-router.put('/:id/reject', requireRole('admin', 'staff'), rejectStockSale);
-router.get('/summary', getStockSalesSummary);
 
 module.exports = router;

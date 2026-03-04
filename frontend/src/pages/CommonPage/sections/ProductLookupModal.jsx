@@ -9,7 +9,8 @@ class ProductLookupModal extends React.Component {
       products: [], 
       loading: true, 
       error: null,
-      stockBalances: {} 
+      stockBalances: {},
+      productPrices: {} 
     };
   }
 
@@ -19,7 +20,22 @@ class ProductLookupModal extends React.Component {
 
   loadProducts = async () => {
     try {
-      const result = await stockSalesService.getProducts(this.props.societyId);
+      // Get societyId from props or fallback to localStorage
+      let societyId = this.props.societyId;
+      if (!societyId) {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          societyId = parsedUser?.society?._id || parsedUser?.society;
+        }
+      }
+      
+      if (!societyId) {
+        this.setState({ error: 'Society not found', loading: false });
+        return;
+      }
+      
+      const result = await stockSalesService.getProducts(societyId);
       if (result.success) {
         this.setState({ products: result.data, loading: false });
         // Also load stock balances
@@ -34,13 +50,32 @@ class ProductLookupModal extends React.Component {
 
   loadStockBalances = async () => {
     try {
-      const balancesResult = await stockSalesService.getStockBalances(this.props.societyId);
+      // Get societyId from props or fallback to localStorage
+      let societyId = this.props.societyId;
+      if (!societyId) {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          societyId = parsedUser?.society?._id || parsedUser?.society;
+        }
+      }
+      
+      if (!societyId) {
+        console.warn('Society ID not available for stock balances');
+        return;
+      }
+      
+      const balancesResult = await stockSalesService.getStockBalances(societyId);
       if (balancesResult.success && balancesResult.data) {
         const balances = {};
+        const prices = {};
         balancesResult.data.forEach(balance => {
-          balances[balance.product?._id || balance.product] = balance.quantityOnHand || 0;
+          // Ensure consistent string key format
+          const productId = balance.product?._id?.toString() || balance.product?.toString();
+          balances[productId] = balance.quantityOnHand || 0;
+          prices[productId] = balance.unitPrice || 0; // Store the latest unit price
         });
-        this.setState({ stockBalances: balances });
+        this.setState({ stockBalances: balances, productPrices: prices });
       }
     } catch (error) {
       console.error('Error loading stock balances:', error);
@@ -122,20 +157,31 @@ class ProductLookupModal extends React.Component {
                     </thead>
                     <tbody>
                       {rows.length ? (
-                        rows.map((p) => (
+                        rows.map((p) => {
+                          const productId = p._id?.toString();
+                          const stock = this.state.stockBalances[productId] || 0;
+                          const price = this.state.productPrices[productId] || p.sellingPrice || p.price || 0;
+                          return (
                           <tr
                             key={p._id}
-                            onClick={() => onSelect({ ...p, availableStock: this.state.stockBalances[p._id] || 0 })}
+                            onClick={() => {
+                              onSelect({ 
+                                ...p, 
+                                availableStock: stock,
+                                sellingPrice: price // Pass the receipt price
+                              })
+                            }}
                             style={{ cursor: "pointer" }}
                           >
                             <td>{p.code}</td>
                             <td>{p.description || p.name}</td>
-                            <td className="text-end" style={{ fontWeight: 'bold', color: '#28a745' }}>₦{(p.sellingPrice || p.price || 0).toFixed(2)}</td>
-                            <td className="text-end" style={{ fontWeight: 'bold', color: this.state.stockBalances[p._id] > 0 ? '#28a745' : '#dc3545' }}>
-                              {this.state.stockBalances[p._id] || 0}
+                            <td className="text-end" style={{ fontWeight: 'bold', color: '#28a745' }}>₦{price.toFixed(2)}</td>
+                            <td className="text-end" style={{ fontWeight: 'bold', color: stock > 0 ? '#28a745' : '#dc3545' }}>
+                              {stock}
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       ) : (
                         <tr>
                           <td colSpan="4" className="text-center text-muted py-4">

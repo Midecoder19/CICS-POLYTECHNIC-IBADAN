@@ -5,9 +5,9 @@ import { performanceUtils } from '../utils/performance.js';
 // LAN CONFIGURATION - SET YOUR STATIC IP HERE
 // ============================================================
 // This ensures the IP doesn't change on your network
-const STATIC_LAN_IP = 'http://192.168.18.12'; // Change this to your server's static IP
-const API_PORT = '5000';
-const USE_STATIC_IP = false; // Set to true for LAN use, false for dynamic detection
+const STATIC_LAN_IP = 'http://localhost'; // Use localhost for local development
+const API_PORT = '3003';
+const USE_STATIC_IP = false; // Set to false to use localhost for development
 // ============================================================
 
 // Determine API URL based on configuration
@@ -18,20 +18,7 @@ const getApiBaseUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Use static IP for LAN (recommended for production/LAN use)
-  if (USE_STATIC_IP) {
-    const url = `${STATIC_LAN_IP}:${API_PORT}/api`;
-    console.log(`🔗 API URL (static): ${url}`);
-    return url;
-  }
-  
-  // Dynamic detection (may change IP on network restart)
-  if (import.meta.env.PROD || window.location.hostname !== 'localhost') {
-    const url = `http://${window.location.hostname}:${API_PORT}/api`;
-    console.log(`🔗 API URL (dynamic): ${url}`);
-    return url;
-  }
-  
+  // Always use localhost for local development
   const url = `http://localhost:${API_PORT}/api`;
   console.log(`🔗 API URL (localhost): ${url}`);
   return url;
@@ -126,7 +113,13 @@ class ApiClient {
 
   // Generic request method
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+    // Build URL with query params if provided
+    let url = `${this.baseURL}${endpoint}`;
+    console.log('API Request URL:', url); // Debug log
+    if (options.params) {
+      const searchParams = new URLSearchParams(options.params);
+      url += `?${searchParams.toString()}`;
+    }
     const config = {
       headers: {
         'Content-Type': 'application/json',
@@ -257,3 +250,4 @@ export {
 
 // Create a named export 'api' for backward compatibility
 export const api = apiClient;
+

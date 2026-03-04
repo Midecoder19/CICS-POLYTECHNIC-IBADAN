@@ -30,8 +30,10 @@ const StockReceiptVoucher = () => {
 
   const [detailsData, setDetailsData] = useState({
     itemCode: "",
+    measure: "Pieces", // Pieces or Bulk
     unitCost: "",
     quantity: "",
+    bulk: "", // Bulk quantity
     bulkPrice: "",
     amount: "",
   });
@@ -44,7 +46,6 @@ const StockReceiptVoucher = () => {
     netPay: 0,
   });
   const [stockBalance, setStockBalance] = useState(0);
-  const [manualStockBalance, setManualStockBalance] = useState('');
 
   const [modal, setModal] = useState({
     isOpen: false,
@@ -178,22 +179,17 @@ const StockReceiptVoucher = () => {
     setTotals(updatedTotals);
   }, [totals]);
 
-  const handleStockBalanceChange = useCallback((e) => {
-    const value = e.target.value;
-    // Allow empty string or numbers
-    if (value === '' || value === null || value === undefined) {
-      setManualStockBalance('');
-    } else {
-      setManualStockBalance(parseFloat(value) || 0);
-    }
-  }, []);
-
   const handleRoughSheetClick = useCallback((item, index) => {
     // Fill the details form with the clicked item's data
+    // Determine measure based on whether it's pieces or bulk
+    const measure = item.bulk > 0 ? 'Bulk' : 'Pieces';
+    
     setDetailsData({
       itemCode: item.itemCode,
+      measure: measure,
       unitCost: item.unitPrice.toString(),
-      quantity: item.bulk.toString(),
+      quantity: measure === 'Pieces' ? item.pieces.toString() : '',
+      bulk: measure === 'Bulk' ? item.bulk.toString() : '',
       bulkPrice: item.bulkPrice.toString(),
       amount: item.extended.toString()
     });
@@ -213,15 +209,40 @@ const StockReceiptVoucher = () => {
     const { name, value } = e.target;
     const updatedDetails = { ...detailsData, [name]: value };
 
-    // Auto-calculate amount when quantity and unitCost change
-    if (name === 'quantity' || name === 'unitCost') {
-      const quantity = parseFloat(updatedDetails.quantity) || 0;
-      const unitCost = parseFloat(updatedDetails.unitCost) || 0;
-      updatedDetails.amount = stockReceiptService.calculateExtendedAmount(quantity, unitCost);
+    // Handle measure change (Pieces/Bulk)
+    if (name === 'measure') {
+      if (value === 'Pieces') {
+        // When switching to Pieces, clear bulk fields
+        updatedDetails.bulk = '';
+        updatedDetails.bulkPrice = '';
+      } else if (value === 'Bulk') {
+        // When switching to Bulk, clear pieces quantity but keep bulkPrice
+        updatedDetails.quantity = '';
+      }
     }
 
-    // Auto-calculate bulkPrice when unitCost changes (assuming bulkPrice = unitCost for simplicity)
-    if (name === 'unitCost') {
+    // Auto-calculate amount based on measure
+    if (name === 'quantity' || name === 'unitCost' || name === 'bulk' || name === 'bulkPrice') {
+      let quantity = 0;
+      let unitCost = parseFloat(updatedDetails.unitCost) || 0;
+      let bulkPrice = parseFloat(updatedDetails.bulkPrice) || 0;
+      
+      if (updatedDetails.measure === 'Pieces') {
+        // For pieces: quantity is the input, amount = quantity * unitCost
+        quantity = parseFloat(updatedDetails.quantity) || 0;
+        updatedDetails.amount = (quantity * unitCost).toString();
+        updatedDetails.bulk = '';
+        updatedDetails.bulkPrice = '';
+      } else if (updatedDetails.measure === 'Bulk') {
+        // For bulk: bulk is quantity, amount = bulk * bulkPrice
+        const bulkQty = parseFloat(updatedDetails.bulk) || 0;
+        updatedDetails.amount = (bulkQty * bulkPrice).toString();
+        updatedDetails.quantity = '';
+      }
+    }
+
+    // Auto-calculate bulkPrice when unitCost changes in Bulk mode
+    if (name === 'unitCost' && updatedDetails.measure === 'Bulk') {
       updatedDetails.bulkPrice = updatedDetails.unitCost;
     }
 
@@ -297,16 +318,20 @@ const StockReceiptVoucher = () => {
             
             // Map items to rough sheet
             if (receipt.items && receipt.items.length > 0) {
-              const items = receipt.items.map(item => ({
-                itemCode: item.productCode,
-                description: item.productName,
-                measure: item.unit,
-                bulk: item.quantity,
-                bulkPrice: item.unitPrice,
-                pieces: item.quantity,
-                unitPrice: item.unitPrice,
-                extended: item.extendedAmount || (item.quantity * item.unitPrice)
-              }));
+              const items = receipt.items.map(item => {
+                // Determine measure based on unit
+                const measure = item.unit === 'Bulk' ? 'Bulk' : 'Pieces';
+                return {
+                  itemCode: item.productCode,
+                  description: item.productName,
+                  measure: measure,
+                  bulk: measure === 'Bulk' ? item.quantity : 0,
+                  bulkPrice: item.unitPrice,
+                  pieces: measure === 'Pieces' ? item.quantity : 0,
+                  unitPrice: item.unitPrice,
+                  extended: item.extendedAmount || (item.quantity * item.unitPrice)
+                };
+              });
               setRoughSheet(items);
               
               // Calculate totals
@@ -327,12 +352,8 @@ const StockReceiptVoucher = () => {
               });
             }
             
-            // Load stock balance if exists
-            if (receipt.stockBalance !== undefined && receipt.stockBalance !== null) {
-              setManualStockBalance(receipt.stockBalance);
-            } else {
-              setManualStockBalance('');
-            }
+            // Stock balance is now auto-calculated from rough sheet items
+            // No need to load manual stock balance anymore
           }
         } catch (error) {
           console.error('Error loading SRV record:', error);
@@ -346,20 +367,19 @@ const StockReceiptVoucher = () => {
       try {
         const selectedProduct = products.find(p => p._id === value.id || p.code === value.code);
         if (selectedProduct) {
-          const quantity = parseFloat(detailsData.quantity) || 1;
+          // Default to Pieces mode when selecting a product
           const unitCost = parseFloat(selectedProduct.purchasePrice) || 0;
-          const amount = stockReceiptService.calculateExtendedAmount(quantity, unitCost);
-
-          // If quantity is 1 (pieces), bulk price should be empty
-          // If quantity > 1 (bulk), bulk price should have the unit cost
-          const bulkPrice = quantity === 1 ? '' : unitCost.toString();
+          const quantity = 1; // Default to 1 piece
+          const amount = quantity * unitCost;
 
           setDetailsData(prev => ({
             ...prev,
             itemCode: selectedProduct.code,
+            measure: 'Pieces', // Default to Pieces
             unitCost: unitCost.toString(),
-            bulkPrice: bulkPrice,
             quantity: quantity.toString(),
+            bulk: '', // Empty for Pieces mode
+            bulkPrice: '', // Empty for Pieces mode
             amount: amount.toString()
           }));
         } else {
@@ -370,31 +390,49 @@ const StockReceiptVoucher = () => {
         console.error('Error fetching product details:', error);
         setError('Failed to load product details');
       }
-    } else if (field === 'quantity') {
-      // When quantity changes, update bulk price accordingly
-      const newQuantity = parseFloat(value) || 0;
-      const unitCost = parseFloat(detailsData.unitCost) || 0;
-      const amount = stockReceiptService.calculateExtendedAmount(newQuantity, unitCost);
-      
-      // If quantity is 1 (pieces), bulk price should be empty
-      // If quantity > 1 (bulk), bulk price should have the unit cost
-      const bulkPrice = newQuantity === 1 ? '' : (unitCost > 0 ? unitCost.toString() : '');
-      
-      setDetailsData(prev => ({
-        ...prev,
-        quantity: value,
-        bulkPrice: bulkPrice,
-        amount: amount.toString()
-      }));
-      setDetailsData(prev => ({ ...prev, [field]: value }));
+    } else if (field === 'measure') {
+      // Handle measure change (Pieces/Bulk)
+      if (value === 'Pieces') {
+        // Switching to Pieces mode
+        const unitCost = parseFloat(detailsData.unitCost) || 0;
+        setDetailsData(prev => ({
+          ...prev,
+          measure: value,
+          quantity: '1',
+          bulk: '',
+          bulkPrice: '',
+          amount: (1 * unitCost).toString()
+        }));
+      } else if (value === 'Bulk') {
+        // Switching to Bulk mode
+        const unitCost = parseFloat(detailsData.unitCost) || 0;
+        setDetailsData(prev => ({
+          ...prev,
+          measure: value,
+          quantity: '',
+          bulk: '1',
+          bulkPrice: unitCost.toString(),
+          amount: (1 * unitCost).toString()
+        }));
+      }
     }
     closeModal();
   }, [closeModal, headerData, detailsData, products, stockReceiptService]);
 
   const handleAddItem = useCallback(() => {
-    // Validate required fields
-    if (!detailsData.itemCode || !detailsData.quantity || !detailsData.unitCost) {
-      setError('Please fill in Item Code, Quantity, and Unit Cost before adding.');
+    // Validate required fields based on measure
+    if (!detailsData.itemCode || !detailsData.unitCost) {
+      setError('Please fill in Item Code and Unit Cost before adding.');
+      return;
+    }
+
+    if (detailsData.measure === 'Pieces' && !detailsData.quantity) {
+      setError('Please enter quantity for pieces.');
+      return;
+    }
+
+    if (detailsData.measure === 'Bulk' && !detailsData.bulk) {
+      setError('Please enter bulk quantity.');
       return;
     }
 
@@ -408,15 +446,30 @@ const StockReceiptVoucher = () => {
 
     const extendedAmount = parseFloat(detailsData.amount) || 0;
 
+    // Determine quantity based on measure
+    let quantity = 0;
+    let bulkQty = 0;
+    if (detailsData.measure === 'Pieces') {
+      quantity = parseFloat(detailsData.quantity) || 0;
+      bulkQty = 0; // Empty for pieces
+    } else {
+      quantity = 0; // Empty for bulk
+      bulkQty = parseFloat(detailsData.bulk) || 0;
+    }
+
     const newItem = {
       itemCode: detailsData.itemCode,
       description: selectedProduct.name || selectedProduct.description || detailsData.itemCode,
-      measure: selectedProduct.unit || "Unit",
-      bulk: parseFloat(detailsData.quantity) || 0,
+      measure: detailsData.measure || 'Pieces',
+      bulk: bulkQty,
       bulkPrice: parseFloat(detailsData.bulkPrice) || 0,
-      pieces: parseFloat(detailsData.quantity) || 0,
+      pieces: quantity,
       unitPrice: parseFloat(detailsData.unitCost) || 0,
       extended: extendedAmount,
+      // Store original product ID for updating price later
+      productId: selectedProduct._id,
+      originalPurchasePrice: selectedProduct.purchasePrice,
+      newPurchasePrice: parseFloat(detailsData.unitCost) || 0,
     };
 
     setRoughSheet(prev => [...prev, newItem]);
@@ -424,8 +477,10 @@ const StockReceiptVoucher = () => {
     // Reset details
     setDetailsData({
       itemCode: "",
+      measure: "Pieces",
       unitCost: "",
       quantity: "",
+      bulk: "",
       bulkPrice: "",
       amount: "",
     });
@@ -478,8 +533,10 @@ const StockReceiptVoucher = () => {
     });
     setDetailsData({
       itemCode: "",
+      measure: "Pieces",
       unitCost: "",
       quantity: "",
+      bulk: "",
       bulkPrice: "",
       amount: "",
     });
@@ -490,7 +547,6 @@ const StockReceiptVoucher = () => {
       vatAmount: 0,
       netPay: 0,
     });
-    setManualStockBalance('');
     setError(null);
     setSuccess(null);
   }, [generateSrvNo]);
@@ -520,7 +576,7 @@ const StockReceiptVoucher = () => {
         product: products.find(p => p.code === item.itemCode)?._id,
         productCode: item.itemCode,
         productName: item.description,
-        quantity: item.bulk,
+        quantity: item.measure === 'Pieces' ? item.pieces : item.bulk,
         unit: item.measure,
         unitPrice: item.unitPrice,
         extendedAmount: item.extended
@@ -538,10 +594,10 @@ const StockReceiptVoucher = () => {
         invoiceDate: headerData.invoiceDate,
         items: items,
         totalAmount: totals.totalAmount,
-        totalQuantity: roughSheet.reduce((sum, item) => sum + item.bulk, 0),
+        totalQuantity: roughSheet.reduce((sum, item) => sum + (item.measure === 'Pieces' ? item.pieces : item.bulk), 0),
         status: headerData.status || 'draft',
         remarks: `Updated via Stock Receipt Voucher - ${new Date().toISOString()}`,
-        stockBalance: manualStockBalance === '' ? 0 : parseFloat(manualStockBalance)
+        stockBalance: roughSheet.reduce((sum, item) => sum + (item.measure === 'Pieces' ? item.pieces : item.bulk), 0)
       };
 
       // Call API to update stock receipt
@@ -551,9 +607,29 @@ const StockReceiptVoucher = () => {
         setSuccess('Stock Receipt Voucher updated successfully!');
         setError(null);
         
+        // Update product prices if they have changed
+        for (const item of roughSheet) {
+          if (item.productId && item.originalPurchasePrice !== item.newPurchasePrice) {
+            try {
+              await stockReceiptService.updateProductPrice(item.productId, item.newPurchasePrice);
+              console.log(`Updated product ${item.itemCode} price: ${item.originalPurchasePrice} -> ${item.newPurchasePrice}`);
+            } catch (priceError) {
+              console.error(`Failed to update product ${item.itemCode} price:`, priceError);
+            }
+          }
+        }
+        
+        // Reload stock balance from server
+        const updateSocietyId = user?.society?._id || user?.society;
+        if (updateSocietyId) {
+          const balanceResult = await stockReceiptService.getTotalStockBalance(updateSocietyId);
+          if (balanceResult.success) {
+            setStockBalance(balanceResult.data.totalQuantity || 0);
+          }
+        }
+        
         // Refresh receipts list
-        const societyId = user?.society?._id || user?.society;
-        const receiptsRes = await stockReceiptService.getStockReceipts({ society: societyId, limit: 1000 });
+        const receiptsRes = await stockReceiptService.getStockReceipts({ society: updateSocietyId, limit: 1000 });
         if (receiptsRes.success) {
           setReceipts(receiptsRes.data);
         }
@@ -587,6 +663,15 @@ const StockReceiptVoucher = () => {
         setSuccess('Stock Receipt Voucher deleted successfully!');
         setError(null);
         
+        // Reload stock balance from server
+        const deleteSocietyId = user?.society?._id || user?.society;
+        if (deleteSocietyId) {
+          const balanceResult = await stockReceiptService.getTotalStockBalance(deleteSocietyId);
+          if (balanceResult.success) {
+            setStockBalance(balanceResult.data.totalQuantity || 0);
+          }
+        }
+        
         // Reset form
         setHeaderData({
           store: "",
@@ -612,8 +697,7 @@ const StockReceiptVoucher = () => {
         });
         
         // Refresh receipts list
-        const societyId = user?.society?._id || user?.society;
-        const receiptsRes = await stockReceiptService.getStockReceipts({ society: societyId, limit: 1000 });
+        const receiptsRes = await stockReceiptService.getStockReceipts({ society: deleteSocietyId, limit: 1000 });
         if (receiptsRes.success) {
           setReceipts(receiptsRes.data);
         }
@@ -658,7 +742,7 @@ const StockReceiptVoucher = () => {
         product: products.find(p => p.code === item.itemCode)?._id,
         productCode: item.itemCode,
         productName: item.description,
-        quantity: item.bulk,
+        quantity: item.measure === 'Pieces' ? item.pieces : item.bulk,
         unit: item.measure,
         unitPrice: item.unitPrice,
         extendedAmount: item.extended
@@ -677,10 +761,10 @@ const StockReceiptVoucher = () => {
         invoiceDate: headerData.invoiceDate,
         items: items,
         totalAmount: totals.totalAmount,
-        totalQuantity: roughSheet.reduce((sum, item) => sum + item.bulk, 0),
+        totalQuantity: roughSheet.reduce((sum, item) => sum + (item.measure === 'Pieces' ? item.pieces : item.bulk), 0),
         status: headerData.status || 'draft',
         remarks: `Created via Stock Receipt Voucher - ${new Date().toISOString()}`,
-        stockBalance: manualStockBalance === '' ? 0 : parseFloat(manualStockBalance)
+        stockBalance: roughSheet.reduce((sum, item) => sum + (item.measure === 'Pieces' ? item.pieces : item.bulk), 0)
       };
 
       // Call API to create stock receipt
@@ -690,8 +774,26 @@ const StockReceiptVoucher = () => {
         setSuccess('Stock Receipt Voucher saved successfully!');
         setError(null);
 
-        // Use the manual stock balance that was saved
-        setStockBalance(manualStockBalance === '' ? 0 : manualStockBalance);
+        // Update product prices if they have changed
+        for (const item of roughSheet) {
+          if (item.productId && item.originalPurchasePrice !== item.newPurchasePrice) {
+            try {
+              await stockReceiptService.updateProductPrice(item.productId, item.newPurchasePrice);
+              console.log(`Updated product ${item.itemCode} price: ${item.originalPurchasePrice} -> ${item.newPurchasePrice}`);
+            } catch (priceError) {
+              console.error(`Failed to update product ${item.itemCode} price:`, priceError);
+            }
+          }
+        }
+
+        // Reload stock balance from server
+        const receiptSocietyId = user?.society?._id || user?.society;
+        if (receiptSocietyId) {
+          const balanceResult = await stockReceiptService.getTotalStockBalance(receiptSocietyId);
+          if (balanceResult.success) {
+            setStockBalance(balanceResult.data.totalQuantity || 0);
+          }
+        }
 
         // Reset form after successful save
         setHeaderData({
@@ -710,8 +812,10 @@ const StockReceiptVoucher = () => {
         });
         setDetailsData({
           itemCode: "",
+          measure: "Pieces",
           unitCost: "",
           quantity: "",
+          bulk: "",
           bulkPrice: "",
           amount: "",
         });
@@ -722,11 +826,9 @@ const StockReceiptVoucher = () => {
           vatAmount: 0,
           netPay: 0,
         });
-        setManualStockBalance('');
         
         // Refresh receipts list to show new SRV in lookup
-        const societyId = user?.society?._id || user?.society;
-        const receiptsRes = await stockReceiptService.getStockReceipts({ society: societyId, limit: 1000 });
+        const receiptsRes = await stockReceiptService.getStockReceipts({ society: receiptSocietyId, limit: 1000 });
         if (receiptsRes.success) {
           setReceipts(receiptsRes.data);
         }
@@ -739,7 +841,7 @@ const StockReceiptVoucher = () => {
     } finally {
       setLoading(false);
     }
-  }, [headerData, roughSheet, totals, products, suppliers, user, manualStockBalance]);
+  }, [headerData, roughSheet, totals, products, suppliers, user]);
 
   const handleCancel = useCallback(() => {
     navigate("/dashboard");
@@ -996,6 +1098,20 @@ const StockReceiptVoucher = () => {
               />
             </div>
 
+            {/* Measure */}
+            <div className="form-group">
+              <label>Measure:</label>
+              <select
+                name="measure"
+                value={detailsData.measure}
+                onChange={handleDetailsChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="Pieces">Pieces</option>
+                <option value="Bulk">Bulk</option>
+              </select>
+            </div>
+
             {/* Unit Cost */}
             <div className="form-group">
               <label>Unit Cost:</label>
@@ -1009,31 +1125,47 @@ const StockReceiptVoucher = () => {
               />
             </div>
 
-            {/* Quantity */}
-            <div className="form-group">
-              <label>Quantity:</label>
-              <input
-                type="number"
-                name="quantity"
-                value={detailsData.quantity}
-                onChange={handleDetailsChange}
-                placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {/* Quantity (for Pieces) or Bulk (for Bulk) */}
+            {detailsData.measure === 'Pieces' ? (
+              <div className="form-group">
+                <label>Quantity:</label>
+                <input
+                  type="number"
+                  name="quantity"
+                  value={detailsData.quantity}
+                  onChange={handleDetailsChange}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            ) : (
+              <div className="form-group">
+                <label>Bulk Qty:</label>
+                <input
+                  type="number"
+                  name="bulk"
+                  value={detailsData.bulk}
+                  onChange={handleDetailsChange}
+                  placeholder="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
-            {/* Bulk Price */}
-            <div className="form-group">
-              <label>Bulk Price:</label>
-              <input
-                type="number"
-                name="bulkPrice"
-                value={detailsData.bulkPrice}
-                onChange={handleDetailsChange}
-                placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {/* Bulk Price (only show in Bulk mode) */}
+            {detailsData.measure === 'Bulk' && (
+              <div className="form-group">
+                <label>Bulk Price:</label>
+                <input
+                  type="number"
+                  name="bulkPrice"
+                  value={detailsData.bulkPrice}
+                  onChange={handleDetailsChange}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            )}
 
             {/* Amount */}
             <div className="form-group">
@@ -1044,7 +1176,8 @@ const StockReceiptVoucher = () => {
                 value={detailsData.amount}
                 onChange={handleDetailsChange}
                 placeholder="0.00"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                readOnly
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-100"
               />
             </div>
           </div>
@@ -1144,13 +1277,13 @@ const StockReceiptVoucher = () => {
           </div>
           <div className="totals-right">
             <div className="form-group">
-              <label>Stock Balance:</label>
+              <label>Stock Balance :</label>
               <input
                 type="number"
-                value={manualStockBalance}
-                onChange={handleStockBalanceChange}
-                placeholder="Enter stock balance"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={roughSheet.reduce((sum, item) => sum + (item.measure === 'Pieces' ? item.pieces : item.bulk), 0)}
+                readOnly
+                placeholder="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
               />
             </div>
           </div>

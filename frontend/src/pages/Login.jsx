@@ -93,12 +93,14 @@ const Login = () => {
       const userData = await login(username, password);
 
       setState(prev => ({ ...prev, loading: false, showSuccessModal: true, successMessage: 'Login successful! Redirecting...', justLoggedIn: true }));
-      // Redirect immediately based on user role from response
-      if (userData && userData.role === 'member') {
-        navigate('/member/dashboard');
-      } else if (userData && (userData.role === 'staff' || userData.role === 'admin')) {
-        navigate('/dashboard');
-      }
+      // Redirect after showing success modal
+      setTimeout(() => {
+        if (userData && userData.role === 'member') {
+          navigate('/member/dashboard');
+        } else if (userData && (userData.role === 'staff' || userData.role === 'admin')) {
+          navigate('/dashboard');
+        }
+      }, 1500);
     } catch (error) {
       const newAttempts = loginAttempts + 1;
       setState(prev => ({ ...prev, loginAttempts: newAttempts, loading: false }));

@@ -7,10 +7,11 @@ const Society = require('../models/Society');
 const getStoreInformation = async (req, res) => {
   try {
     const { society, active } = req.query;
-    const query = {};
-
+    // If society is provided, return stores for that society OR stores without society (global)
+    let query = {};
+    
     if (society) {
-      query.society = society;
+      query = { $or: [{ society }, { society: { $exists: false } }] };
     }
 
     if (active !== undefined) {
