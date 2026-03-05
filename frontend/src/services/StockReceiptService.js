@@ -225,6 +225,32 @@ class StockReceiptService {
     const sequence = '00001'; // Placeholder
     return `${year}${sequence}`;
   }
+
+  // Get default parameters
+  async getDefaultParameters(societyId = null) {
+    try {
+      const params = societyId ? { society: societyId } : {};
+      const response = await apiClient.get('/common/default-parameters', { params });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching default parameters:', error);
+      throw error;
+    }
+  }
+
+  // Get financial periods
+  async getFinancialPeriods(societyId = null) {
+    try {
+      const params = societyId ? { society: societyId } : {};
+      const response = await apiClient.get('/common/financial-periods', { params });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching financial periods:', error);
+      throw error;
+    }
+  }
 }
 
 const stockReceiptService = new StockReceiptService();

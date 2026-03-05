@@ -48,8 +48,8 @@ const ProductInformation = () => {
     try {
       setLoading(true);
       const [storesRes, suppliersRes, unitsRes] = await Promise.all([
-        ProductService.getStores(user?.society),
-        ProductService.getSuppliers(user?.society),
+        ProductService.getStores(user?.society?._id || user?.society),
+        ProductService.getSuppliers(user?.society?._id || user?.society),
         ProductService.getUnits()
       ]);
 
@@ -83,7 +83,7 @@ const ProductInformation = () => {
       } else if (type === 'units') {
         data = units;
       } else if (type === 'products') {
-        const result = await ProductService.searchProducts('', user?.society);
+        const result = await ProductService.searchProducts('');
         data = result.data || [];
       }
 
@@ -106,7 +106,7 @@ const ProductInformation = () => {
   const selectFromModal = useCallback(async (field, value) => {
     if (field === 'code') {
       try {
-        const result = await ProductService.searchProducts(value, user?.society);
+        const result = await ProductService.searchProducts(value);
         if (result.data && result.data.length > 0) {
           const product = result.data[0];
           setFormData({
@@ -558,7 +558,7 @@ const ProductInformation = () => {
       {/* Modal */}
       {modal.isOpen && (
         <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-start justify-content-center pt-5"
           style={{
             background: "rgba(0, 0, 0, 0.5)",
             backdropFilter: "blur(6px)",

@@ -31,15 +31,18 @@ const getStockBalances = async (req, res) => {
     console.log('Society ID from request:', society);
     console.log('Query society ObjectId:', new mongoose.Types.ObjectId(society));
     
-    // Get all stock receipts for this society (no filters)
-    const receiptsAll = await StockReceipt.find({ society: society }).populate('items.product', 'code name unit');
-    const receipts = receiptsAll; // Use all receipts
+    // Get all ACTIVE stock receipts for this society
+    const receiptsAll = await StockReceipt.find({ 
+      society: society,
+      isActive: true
+    }).populate('items.product', 'code name unit');
+    const receipts = receiptsAll;
     
     console.log('=== Stock Balance Query Debug ===');
     console.log('Society ID from request:', society);
     console.log('Total receipts in DB:', receiptsAll.length);
 
-    // Get all stock sales for this society (no status filter - count all)
+    // Get all ACTIVE stock sales for this society
     const sales = await StockSales.find({
       society: society,
       isActive: true

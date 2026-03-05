@@ -1,13 +1,14 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useReactToPrint } from "react-to-print";
-import { Plus, Save, RotateCcw, Loader, Trash2, Printer, Search, Key } from "lucide-react";
+import { Plus, Save, RotateCcw, Loader, Trash2, Printer, Search, Key, FileDown } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContext.jsx";
 import stockSalesService from "../../../services/StockSalesService.js";
 import StoreLookupModal from "../../CommonPage/sections/StoreLookupModal";
 import ProductLookupModal from "../../CommonPage/sections/ProductLookupModal";
 import MemberLookupModal from "../../CommonPage/sections/MemberLookupModal";
 import { api } from "../../../config/api.js";
+import xprinterPOS from "../../../utils/xprinterPOS.js";
 import "../../../styles/StockSales.css";
 import "../../../styles/StockSales.css";
 
@@ -311,6 +312,119 @@ const StockSales = () => {
     documentTitle: `SIV-${headerData.sivNo || 'Draft'}`,
   });
 
+  // Save receipt as PDF
+  const handleSavePDF = () => {
+    if (!headerData.sivNo || items.length === 0) {
+      setError("No sale data available. Please add items and ensure SIV number is generated.");
+      return;
+    }
+    
+    try {
+      // Open print dialog with PDF option
+      const printWindow = window.open('', '_blank');
+      
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SIV-${headerData.sivNo || 'Receipt'}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      padding: 20px; 
+      max-width: 800px; 
+      margin: 0 auto;
+    }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { font-size: 24px; margin-bottom: 5px; }
+    .header p { color: #666; font-size: 14px; }
+    .info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+    .info-left, .info-right { font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    table th { background: #f5f5f5; font-weight: bold; }
+    table td.amount { text-align: right; }
+    .totals { text-align: right; }
+    .totals .row { display: flex; justify-content: flex-end; margin: 5px 0; }
+    .totals .label { width: 150px; font-weight: bold; }
+    .totals .value { width: 100px; }
+    .total-row { font-size: 18px; border-top: 2px solid #333; padding-top: 10px; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+    @media print {
+      body { padding: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${user?.society?.name || 'Store Name'}</h1>
+    <p>Stock Issue Voucher (SIV)</p>
+  </div>
+  
+  <div class="info">
+    <div class="info-left">
+      <strong>SIV No:</strong> ${headerData.sivNo || '-'}
+    </div>
+    <div class="info-right">
+      <strong>Date:</strong> ${new Date(headerData.issueDate).toLocaleDateString()}
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Description</th>
+        <th>Qty</th>
+        <th>Unit Price</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${items.map(item => `
+      <tr>
+        <td>${item.productCode || ''}</td>
+        <td>${item.productName || item.description || '-'}</td>
+        <td>${item.quantity}</td>
+        <td class="amount">${(item.unitPrice || 0).toFixed(2)}</td>
+        <td class="amount">${(item.extendedAmount || 0).toFixed(2)}</td>
+      </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div class="totals">
+    <div class="row"><span class="label">Subtotal:</span><span class="value">${totalAmount.toFixed(2)}</span></div>
+    <div class="row"><span class="label">Discount:</span><span class="value">${discountAmount.toFixed(2)}</span></div>
+    <div class="row"><span class="label">VAT:</span><span class="value">${vatAmount.toFixed(2)}</span></div>
+    <div class="row total-row"><span class="label">Total:</span><span class="value">${netAmount.toFixed(2)}</span></div>
+  </div>
+  
+  <div class="footer">
+    <p>Thank you for your business!</p>
+    <p>Generated on ${new Date().toLocaleString()}</p>
+  </div>
+  
+  <div class="no-print" style="text-align: center; margin-top: 20px;">
+    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;">Save as PDF / Print</button>
+  </div>
+</body>
+</html>`;
+      
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      
+      // Auto-trigger print dialog after content loads
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } catch (err) {
+      setError("Failed to generate PDF: " + err.message);
+    }
+  };
+
   const handlePOS = async () => {
     // POS printing - thermal receipt
     if (!headerData.sivNo || items.length === 0) {
@@ -318,54 +432,39 @@ const StockSales = () => {
       return;
     }
     try {
-      // Print thermal POS receipt
-      const printWindow = window.open('', '_blank');
-      const itemsHtml = items.map(item =>
-        '<tr>' +
-          '<td>' + (item.productCode || '') + '</td>' +
-          '<td>' + (item.description || item.productName || '-') + '</td>' +
-          '<td>' + item.quantity + '</td>' +
-          '<td style="text-align: right;">' + (item.unitPrice?.toFixed(2) || '0.00') + '</td>' +
-          '<td style="text-align: right;">' + (item.extendedAmount?.toFixed(2) || '0.00') + '</td>' +
-        '</tr>'
-      ).join('');
-      const htmlContent =
-        '<html>' +
-          '<head>' +
-            '<title>POS Receipt</title>' +
-            '<style>' +
-              'body { font-family: monospace; font-size: 12px; width: 300px; margin: 0; }' +
-              '.center { text-align: center; }' +
-              '.bold { font-weight: bold; }' +
-              'table { width: 100%; border-collapse: collapse; }' +
-              'td { padding: 2px 0; }' +
-              '.total { border-top: 1px solid #000; margin-top: 5px; }' +
-            '</style>' +
-          '</head>' +
-          '<body>' +
-            '<div class="center bold">' + (user?.society?.name || 'Society') + '</div>' +
-            '<div class="center">POINT OF SALE RECEIPT</div>' +
-            '<div class="center">SIV: ' + headerData.sivNo + '</div>' +
-            '<div class="center">Date: ' + new Date(headerData.issueDate).toLocaleDateString() + '</div>' +
-            '<hr>' +
-            '<table>' +
-              '<tr><th>Code</th><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th></tr>' +
-              itemsHtml +
-            '</table>' +
-            '<div class="total">' +
-              '<div>Total: ' + totalAmount.toFixed(2) + '</div>' +
-              '<div>Discount: ' + discountAmount.toFixed(2) + '</div>' +
-              '<div>VAT: ' + vatAmount.toFixed(2) + '</div>' +
-              '<div class="bold">Net: ' + netAmount.toFixed(2) + '</div>' +
-            '</div>' +
-            '<div class="center">Thank you for your business!</div>' +
-          '</body>' +
-        '</html>';
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.print();
+      // Prepare receipt data for Xprinter
+      const receiptData = {
+        companyName: user?.society?.name || 'Store Name',
+        companyAddress: user?.society?.address || '',
+        companyPhone: user?.society?.phone || '',
+        receiptTitle: 'POINT OF SALE',
+        receiptNumber: headerData.sivNo,
+        date: headerData.issueDate,
+        cashier: user?.username || '',
+        items: items.map(item => ({
+          name: item.productName || item.description || '',
+          productCode: item.productCode,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          extendedAmount: item.extendedAmount
+        })),
+        subtotal: totalAmount,
+        discount: discountAmount,
+        tax: vatAmount,
+        total: netAmount,
+        paymentMethod: 'CASH',
+        amountPaid: netAmount,
+        change: 0,
+        footerMessage: 'Thank you for your business!',
+        footerMessage2: 'Please come again',
+        barcode: headerData.sivNo
+      };
+      
+      // Use Xprinter utility for printing
+      xprinterPOS.print(receiptData);
+      
     } catch (err) {
-      setError("Failed to print POS receipt.");
+      setError("Failed to print POS receipt: " + err.message);
     }
   };
 
@@ -594,6 +693,7 @@ const StockSales = () => {
         <button onClick={resetForm}><Plus size={16} /> Add</button>
         <button onClick={handleSave} disabled={!canEdit || loading.action}><Save size={16} /> Update</button>
         <button onClick={handleDelete} disabled={!headerData._id || !canEdit || loading.action}><Trash2 size={16} /> Delete</button>
+        <button onClick={handleSavePDF}><FileDown size={16} /> Save PDF</button>
         <button onClick={handlePrint}><Printer size={16} /> Print</button>
       </div>
 
@@ -715,7 +815,7 @@ const StockSales = () => {
               if (!headerData.sivNo) {
                 setHeaderData(prev => ({ ...prev, sivNo: generateSivNo() }));
               }
-            }} disabled={!canEdit || !currentItem.product} className="btn btn-primary">
+            }} disabled={!canEdit || !currentItem.product} className="btn btn-primary" style={{ minWidth: '80px' }}>
               OK
             </button>
             <button onClick={() => {

@@ -20,22 +20,22 @@ echo Your server IP address is: %IP%
 echo.
 
 echo Updating frontend configuration...
-echo VITE_API_URL=http://%IP%:5000/api> frontend\.env
+echo VITE_API_URL=http://%IP%:3003/api> frontend\.env
 
 echo.
 echo ========================================
 echo Network configuration completed!
 echo ========================================
 echo.
-echo Frontend API URL updated to: http://%IP%:5000/api
+echo Frontend API URL updated to: http://%IP%:3003/api
 echo.
 echo Instructions for other devices:
 echo 1. Connect to the same Wi-Fi network
 echo 2. Open a web browser
-echo 3. Navigate to: http://%IP%:5173
+echo 3. Navigate to: http://%IP%:3000
 echo.
 echo Make sure:
-echo - Windows Firewall allows connections on ports 5000 and 5173
+echo - Windows Firewall allows connections on ports 3000 and 3003
 echo - All devices are on the same network
 echo - The server laptop stays awake and connected
 echo.

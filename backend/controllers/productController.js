@@ -215,7 +215,8 @@ const searchProducts = async (req, res) => {
 
     let searchQuery = {};
 
-    if (society) {
+    // Only filter by society if explicitly provided and not empty
+    if (society && society.trim() !== '') {
       searchQuery.society = society;
     }
 

@@ -433,20 +433,32 @@ class SocietyInfo extends React.Component {
                   <span>No Logo</span>
                 )}
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={this.handleLogoUpload}
-                disabled={loading}
-              />
-              <button
-                type="button"
-                className="clear-logo-btn"
-                onClick={this.handleClearLogo}
-                disabled={loading}
-              >
-                Clear Logo
-              </button>
+              <div className="logo-buttons">
+                <button
+                  type="button"
+                  className="load-logo-btn"
+                  onClick={() => document.getElementById('logo-input').click()}
+                  disabled={loading}
+                >
+                  Load Logo
+                </button>
+                <input
+                  id="logo-input"
+                  type="file"
+                  accept="image/*"
+                  onChange={this.handleLogoUpload}
+                  disabled={loading}
+                  style={{ display: 'none' }}
+                />
+                <button
+                  type="button"
+                  className="clear-logo-btn"
+                  onClick={this.handleClearLogo}
+                  disabled={loading}
+                >
+                  Clear Logo
+                </button>
+              </div>
             </div>
           </div>
 

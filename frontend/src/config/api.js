@@ -2,12 +2,18 @@
 import { performanceUtils } from '../utils/performance.js';
 
 // ============================================================
-// LAN CONFIGURATION - SET YOUR STATIC IP HERE
+// CONFIGURATION FOR LOCAL AND NETWORK ACCESS
 // ============================================================
-// This ensures the IP doesn't change on your network
-const STATIC_LAN_IP = 'http://localhost'; // Use localhost for local development
+// For LOCAL development: use localhost
+// For NETWORK access: use your computer's IP address
+// 
+// TO FIND YOUR IP (Windows): ipconfig
+// TO FIND YOUR IP (Mac/Linux): ifconfig
+// Example: const STATIC_LAN_IP = 'http://192.168.1.100';
+// ============================================================
+const STATIC_LAN_IP = 'http://localhost'; // Change to your PC's IP address for network access
 const API_PORT = '3003';
-const USE_STATIC_IP = false; // Set to false to use localhost for development
+const USE_NETWORK_IP = false; // Set to true for network access, false for localhost
 // ============================================================
 
 // Determine API URL based on configuration
@@ -18,7 +24,14 @@ const getApiBaseUrl = () => {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Always use localhost for local development
+  // Use network IP if enabled
+  if (USE_NETWORK_IP && STATIC_LAN_IP !== 'http://localhost') {
+    const url = `${STATIC_LAN_IP}:${API_PORT}/api`;
+    console.log(`🔗 API URL (network): ${url}`);
+    return url;
+  }
+  
+  // Default to localhost
   const url = `http://localhost:${API_PORT}/api`;
   console.log(`🔗 API URL (localhost): ${url}`);
   return url;

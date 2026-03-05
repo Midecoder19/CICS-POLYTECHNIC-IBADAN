@@ -89,6 +89,44 @@
     width: 250px;
 }
 
+.logo-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.load-logo-btn {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+}
+
+.load-logo-btn:hover {
+    background: #1d4ed8;
+}
+
+.load-logo-btn:disabled,
+.clear-logo-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.clear-logo-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+}
+
+.clear-logo-btn:hover {
+    background: #dc2626;
+}
+
 .logo-box {
     width: 200px;
     height: 200px;
@@ -106,15 +144,6 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-}
-
-.clear-logo-btn {
-    background: #ef4444;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 0.5rem 0.8rem;
-    cursor: pointer;
 }
 
 .footer-buttons {

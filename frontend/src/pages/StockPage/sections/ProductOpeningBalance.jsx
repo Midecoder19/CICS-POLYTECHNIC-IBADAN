@@ -48,9 +48,9 @@ const ProductOpeningBalance = () => {
     try {
       setLoading(true);
       const [storesRes, productsRes, periodsRes] = await Promise.all([
-        ProductService.getStores(user?.society),
-        ProductService.searchProducts('', user?.society),
-        ProductService.getFinancialPeriods(user?.society)
+        ProductService.getStores(user?.society?._id || user?.society),
+        ProductService.searchProducts(''),
+        ProductService.getFinancialPeriods(user?.society?._id || user?.society)
       ]);
 
       setStores(storesRes.data || []);
@@ -495,7 +495,7 @@ const ProductOpeningBalance = () => {
       {/* Modal */}
       {modal.isOpen && (
         <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-start justify-content-center pt-5"
           style={{
             background: "rgba(0, 0, 0, 0.5)",
             backdropFilter: "blur(6px)",

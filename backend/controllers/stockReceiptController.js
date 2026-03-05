@@ -112,10 +112,9 @@ const createStockReceipt = async (req, res) => {
   try {
     const receiptData = { ...req.body };
 
-    // Generate receipt number if not provided
-    if (!receiptData.receiptNumber) {
-      receiptData.receiptNumber = await StockReceipt.generateReceiptNumber(new Date(receiptData.receiptDate));
-    }
+    // Always generate a fresh receipt number to avoid race conditions
+    // The frontend may send a receiptNumber, but we should generate our own
+    receiptData.receiptNumber = await StockReceipt.generateReceiptNumber(new Date(receiptData.receiptDate));
 
     // Validate supplier if provided
     if (receiptData.supplier) {
@@ -203,6 +202,9 @@ const createStockReceipt = async (req, res) => {
 const updateStockReceipt = async (req, res) => {
   try {
     const updateData = { ...req.body };
+
+    // Prevent changing receiptNumber during update to avoid duplicate errors
+    delete updateData.receiptNumber;
 
     // Validate supplier if being changed
     if (updateData.supplier) {

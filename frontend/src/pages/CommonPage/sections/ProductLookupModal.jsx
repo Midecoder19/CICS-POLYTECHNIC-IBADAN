@@ -99,7 +99,7 @@ class ProductLookupModal extends React.Component {
 
     return (
       <div
-        className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+        className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-start justify-content-center pt-5"
         style={{
           background: "rgba(0, 0, 0, 0.5)",
           backdropFilter: "blur(6px)",

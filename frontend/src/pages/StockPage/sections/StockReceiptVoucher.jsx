@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Key, Plus, Edit, Trash, Printer, X, HelpCircle, Save, RotateCcw, Loader } from "lucide-react";
+import { Key, Plus, Edit, Trash, Printer, X, HelpCircle, Save, RotateCcw, Loader, FileDown } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContext.jsx";
 import { api } from "../../../config/api.js";
 import stockReceiptService from "../../../services/StockReceiptService.js";
@@ -28,15 +28,15 @@ const StockReceiptVoucher = () => {
     status: "draft",
   }));
 
-  const [detailsData, setDetailsData] = useState({
+  const [detailsData, setDetailsData] = useState(() => ({
     itemCode: "",
-    measure: "Pieces", // Pieces or Bulk
+    measure: "Piece", // Piece or Bulk
     unitCost: "",
     quantity: "",
     bulk: "", // Bulk quantity
     bulkPrice: "",
     amount: "",
-  });
+  }));
 
   const [roughSheet, setRoughSheet] = useState([]);
   const [totals, setTotals] = useState({
@@ -64,6 +64,9 @@ const StockReceiptVoucher = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
   const [receipts, setReceipts] = useState([]);
+  const [defaultParams, setDefaultParams] = useState({ discountRate: 0, vatRate: 0 });
+  const [financialPeriods, setFinancialPeriods] = useState([]);
+  const [currentPeriod, setCurrentPeriod] = useState(null);
 
   // Load initial data
   useEffect(() => {
@@ -94,14 +97,22 @@ const StockReceiptVoucher = () => {
       setLoading(true);
       const societyId = user?.society?._id || user?.society;
 
-      const [storesRes, suppliersRes, productsRes, receiptsRes] = await Promise.all([
+      const [storesRes, suppliersRes, productsRes, receiptsRes, defaultParamsRes, periodsRes] = await Promise.all([
         stockReceiptService.getStores(societyId),
         stockReceiptService.getSuppliers(societyId),
         stockReceiptService.getProducts(societyId),
-        stockReceiptService.getStockReceipts({ society: societyId, limit: 1000 }) // Load receipts for SRV number generation
+        stockReceiptService.getStockReceipts({ society: societyId, limit: 1000 }),
+        stockReceiptService.getDefaultParameters(societyId),
+        stockReceiptService.getFinancialPeriods(societyId)
       ]);
 
-      if (storesRes.success) setStores(storesRes.data);
+      if (storesRes.success) {
+        setStores(storesRes.data);
+        // Set default store (first store)
+        if (storesRes.data.length > 0 && !headerData.store) {
+          setHeaderData(prev => ({ ...prev, store: storesRes.data[0]._id }));
+        }
+      }
       if (suppliersRes.success) setSuppliers(suppliersRes.data);
       if (productsRes.success) {
         setProducts(productsRes.data);
@@ -110,6 +121,35 @@ const StockReceiptVoucher = () => {
       if (receiptsRes.success) {
         setReceipts(receiptsRes.data);
         console.log('Receipts loaded:', receiptsRes.data.length);
+      }
+      
+      // Set default parameters (discount rate and vat rate)
+      if (defaultParamsRes.success && defaultParamsRes.data && defaultParamsRes.data.length > 0) {
+        const params = defaultParamsRes.data[0];
+        setDefaultParams({
+          discountRate: params.discountRate || 0,
+          vatRate: params.vatRate || 0
+        });
+        setHeaderData(prev => ({
+          ...prev,
+          discountRate: params.discountRate?.toString() || '',
+          vatRate: params.vatRate?.toString() || ''
+        }));
+      }
+      
+      // Set current financial period
+      if (periodsRes.success && periodsRes.data) {
+        setFinancialPeriods(periodsRes.data);
+        // Find the current open period
+        const today = new Date();
+        const openPeriod = periodsRes.data.find(p => {
+          const startDate = new Date(p.startDate);
+          const endDate = new Date(p.endDate);
+          return today >= startDate && today <= endDate && p.status === 'open';
+        });
+        if (openPeriod) {
+          setCurrentPeriod(openPeriod);
+        }
       }
     } catch (error) {
       console.error('Error loading initial data:', error);
@@ -516,24 +556,27 @@ const StockReceiptVoucher = () => {
     const srvNo = await generateSrvNo();
     const today = new Date().toISOString().split('T')[0];
     
+    // Get default store (first store in list)
+    const defaultStore = stores.length > 0 ? stores[0]._id : "";
+    
     setHeaderData({
-      store: "",
+      store: defaultStore,
       srvNo: srvNo,
       srvDate: today,
       purchaseBy: "cash",
       supplierName: "",
       invoiceNo: "",
-      invoiceDate: "",
-      discountRate: "",
+      invoiceDate: today, // Default to today's date
+      discountRate: defaultParams.discountRate?.toString() || "",
       discountAmount: "",
-      vatRate: "",
+      vatRate: defaultParams.vatRate?.toString() || "",
       vatAmount: "",
       status: "draft",
       _id: null, // Clear any existing ID for new record
     });
     setDetailsData({
       itemCode: "",
-      measure: "Pieces",
+      measure: "Piece", // Default to PIECE
       unitCost: "",
       quantity: "",
       bulk: "",
@@ -549,7 +592,7 @@ const StockReceiptVoucher = () => {
     });
     setError(null);
     setSuccess(null);
-  }, [generateSrvNo]);
+  }, [generateSrvNo, stores, defaultParams]);
 
   const handleUpdate = useCallback(async () => {
     if (!headerData._id) {
@@ -715,6 +758,128 @@ const StockReceiptVoucher = () => {
   const handlePrint = useCallback(() => {
     setShowReport(true);
   }, []);
+
+  // Save receipt as PDF
+  const handleSavePDF = useCallback(() => {
+    if (!headerData.srvNo || roughSheet.length === 0) {
+      setError("No receipt data available. Please add items and ensure SRV number is generated.");
+      return;
+    }
+    
+    try {
+      // Open print window with formatted receipt
+      const printWindow = window.open('', '_blank');
+      
+      const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SRV-${headerData.srvNo || 'Receipt'}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      padding: 20px; 
+      max-width: 800px; 
+      margin: 0 auto;
+    }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { font-size: 24px; margin-bottom: 5px; }
+    .header p { color: #666; font-size: 14px; }
+    .info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+    .info-left, .info-right { font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    table th { background: #f5f5f5; font-weight: bold; }
+    table td.amount { text-align: right; }
+    .totals { text-align: right; }
+    .totals .row { display: flex; justify-content: flex-end; margin: 5px 0; }
+    .totals .label { width: 150px; font-weight: bold; }
+    .totals .value { width: 100px; }
+    .total-row { font-size: 18px; border-top: 2px solid #333; padding-top: 10px; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+    @media print {
+      body { padding: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Stock Receipt Voucher (SRV)</h1>
+    <p>${user?.society?.name || 'Store Name'}</p>
+  </div>
+  
+  <div class="info">
+    <div class="info-left">
+      <strong>SRV No:</strong> ${headerData.srvNo || '-'}
+    </div>
+    <div class="info-right">
+      <strong>Date:</strong> ${new Date(headerData.srvDate).toLocaleDateString()}
+    </div>
+  </div>
+  
+  <div class="info">
+    <div class="info-left">
+      <strong>Supplier:</strong> ${headerData.supplierName || '-'}
+    </div>
+    <div class="info-right">
+      <strong>Invoice No:</strong> ${headerData.invoiceNo || '-'}
+    </div>
+  </div>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Description</th>
+        <th>Qty</th>
+        <th>Unit Price</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${roughSheet.map(item => `
+      <tr>
+        <td>${item.productCode || ''}</td>
+        <td>${item.productName || '-'}</td>
+        <td>${item.measure === 'Pieces' ? item.pieces : item.bulk}</td>
+        <td class="amount">${(item.unitPrice || 0).toFixed(2)}</td>
+        <td class="amount">${(item.extended || 0).toFixed(2)}</td>
+      </tr>
+      `).join('')}
+    </tbody>
+  </table>
+  
+  <div class="totals">
+    <div class="row"><span class="label">Subtotal:</span><span class="value">${(totals.totalAmount || 0).toFixed(2)}</span></div>
+    <div class="row"><span class="label">Discount:</span><span class="value">${(headerData.discountAmount || 0).toFixed(2)}</span></div>
+    <div class="row"><span class="label">VAT:</span><span class="value">${(headerData.vatAmount || 0).toFixed(2)}</span></div>
+    <div class="row total-row"><span class="label">Total:</span><span class="value">${((totals.totalAmount || 0) - (headerData.discountAmount || 0) + (headerData.vatAmount || 0)).toFixed(2)}</span></div>
+  </div>
+  
+  <div class="footer">
+    <p>Thank you!</p>
+    <p>Generated on ${new Date().toLocaleString()}</p>
+  </div>
+  
+  <div class="no-print" style="text-align: center; margin-top: 20px;">
+    <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer;">Save as PDF / Print</button>
+  </div>
+</body>
+</html>`;
+      
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      
+      // Auto-trigger print dialog after content loads
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } catch (err) {
+      setError("Failed to generate PDF: " + err.message);
+    }
+  }, [headerData, roughSheet, totals, user]);
 
   const handleClose = useCallback(() => {
     navigate("/dashboard");
@@ -910,6 +1075,7 @@ const StockReceiptVoucher = () => {
             💾 Update
           </button>
           <button onClick={handleDelete}>🗑 Delete</button>
+          <button onClick={handleSavePDF}><FileDown size={16} /> Save PDF</button>
           <button onClick={handlePrint}>🖨 Print</button>
         </div>
 
@@ -1107,8 +1273,8 @@ const StockReceiptVoucher = () => {
                 onChange={handleDetailsChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="Pieces">Pieces</option>
-                <option value="Bulk">Bulk</option>
+                <option value="Piece">PIECE</option>
+                <option value="Bulk">BULK</option>
               </select>
             </div>
 
@@ -1308,7 +1474,7 @@ const StockReceiptVoucher = () => {
       {/* Modal */}
       {modal.isOpen && (
         <div
-          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+          className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-start justify-content-center pt-5"
           style={{
             background: "rgba(0, 0, 0, 0.5)",
             backdropFilter: "blur(6px)",
