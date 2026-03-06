@@ -32,9 +32,22 @@ async function importData() {
 
     const db = mongoose.connection.db;
 
-    // Import each collection
+    // Import each collection - skip sessions, user auth tokens, and oauth
+    const skipCollections = [
+      'sessions', 
+      'usersessions',
+      'accentsessions',
+      'userAuthTokens',
+      'refreshTokens',
+      'blacklistedTokens'
+    ];
+    
     for (const collName of collections) {
       if (collName.startsWith('system.')) continue;
+      if (skipCollections.includes(collName)) {
+        console.log(`Skipping ${collName} (system collection)`);
+        continue;
+      }
       
       const documents = data[collName];
       if (!documents || !Array.isArray(documents)) continue;
