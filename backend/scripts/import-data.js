@@ -32,14 +32,16 @@ async function importData() {
 
     const db = mongoose.connection.db;
 
-    // Import each collection - skip sessions, user auth tokens, and oauth
+    // SKIP these collections entirely - don't import them
     const skipCollections = [
       'sessions', 
       'usersessions',
       'accentsessions',
       'userAuthTokens',
       'refreshTokens',
-      'blacklistedTokens'
+      'blacklistedTokens',
+      'users',  // Skip users - we'll create fresh admin with seed
+      'societies'  // Skip societies - they reference users
     ];
     
     for (const collName of collections) {
