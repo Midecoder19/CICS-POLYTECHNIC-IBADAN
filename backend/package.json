@@ -11,6 +11,7 @@
     "seed-all": "node scripts/seed-all.js",
     "export-data": "node scripts/export-data.js",
     "import-data": "node scripts/import-data.js",
+    "import-members": "node scripts/import-members.js",
     "seed-members": "node scripts/create-demo-members.js",
     "seed-member-data": "node scripts/seed-member-data.js",
     "import-products": "node scripts/import-products.js",
