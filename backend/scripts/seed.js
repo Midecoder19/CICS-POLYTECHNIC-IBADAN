@@ -32,7 +32,7 @@ const sampleUsers = [
   },
   {
     username: 'demo',
-    password: 'demo',
+    password: 'demo123',
     email: 'demo@polyibadan.com',
     phone: '+2348045678901',
     firstName: 'Demo',
