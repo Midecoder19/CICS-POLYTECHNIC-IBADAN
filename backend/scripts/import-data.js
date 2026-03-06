@@ -40,8 +40,8 @@ async function importData() {
       'userAuthTokens',
       'refreshTokens',
       'blacklistedTokens',
-      'users',  // Skip users - we'll create fresh admin with seed
-      'societies'  // Skip societies - they reference users
+      'users'  // Skip users - we'll create fresh admin with seed
+      // NOTE: Societies WILL be imported but with new IDs
     ];
     
     for (const collName of collections) {
@@ -74,6 +74,27 @@ async function importData() {
       } else {
         console.log(`  (empty collection - skipped)`);
       }
+    }
+
+    // Fix societies to reference admin user
+    try {
+      const adminUser = await db.collection('users').findOne({ username: 'admin' });
+      if (adminUser) {
+        await db.collection('societies').updateMany(
+          {},
+          { $set: { createdBy: adminUser._id } }
+        );
+        console.log('✅ Fixed societies to reference admin user');
+
+        // Clear society field from all users to avoid broken references
+        await db.collection('users').updateMany(
+          {},
+          { $unset: { society: "" } }
+        );
+        console.log('✅ Cleared society references from users');
+      }
+    } catch (e) {
+      console.log('⚠️ Could not fix references:', e.message);
     }
 
     console.log('\n✅ Data import completed!');
